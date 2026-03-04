@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+server/node_modules/
+
+# Environment and secrets
+.env
+.env.local
+*.pem
+
+# Uploads and runtime data
+uploads/
+server/uploads/
+*.log
+npm-debug.log*
+
+# OS and editor
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.idea/
+.vscode/
+*.sublime-*
+
+# ACME / well-known (often host-specific)
+.well-known/
+
+# Local dev / tooling
+.cursor/
+_bmad/

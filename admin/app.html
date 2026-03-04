@@ -1,0 +1,3815 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>El Contador – Finance Admin</title>
+  <style>
+    :root {
+      --bg: #f4f7fb;
+      --panel: #ffffff;
+      --text: #13203a;
+      --muted: #687792;
+      --line: #d9e1ee;
+      --accent: #2d66d7;
+      --danger: #cb3340;
+      --ok: #159767;
+      --recon-in: #2d8f6e;
+      --recon-out: #c45c5c;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    .app {
+      width: min(1200px, 100%);
+      margin: 0 auto;
+      padding: 24px 16px 40px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 28px;
+    }
+
+    .small {
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+    }
+
+    .tab-btn {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      color: var(--text);
+      border-radius: 10px;
+      padding: 10px 14px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    .tab-btn.active {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 16px;
+      margin-bottom: 14px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .field label {
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    input, select, textarea, button {
+      font: inherit;
+    }
+
+    input, select, textarea {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px;
+      background: #fff;
+    }
+
+    textarea {
+      min-height: 84px;
+      resize: vertical;
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+    }
+
+    button {
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: 10px;
+      padding: 10px 14px;
+      cursor: pointer;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+      font-weight: bold;
+    }
+
+    .btn-danger {
+      border-color: #e8bec3;
+      color: var(--danger);
+    }
+
+    .btn-ok {
+      border-color: #c8ebdc;
+      color: var(--ok);
+    }
+
+    .btn-secondary {
+      background: #fff;
+      border: 1px solid var(--line);
+    }
+
+    .btn-secondary:hover {
+      background: #f8fafc;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+
+    th, td {
+      text-align: left;
+      border-bottom: 1px solid var(--line);
+      padding: 9px 8px;
+      vertical-align: top;
+    }
+
+    th {
+      color: var(--muted);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+    .modal-overlay.hidden {
+      display: none;
+    }
+
+    .status-pill {
+      display: inline-block;
+      border-radius: 999px;
+      padding: 4px 8px;
+      font-size: 12px;
+      border: 1px solid;
+    }
+
+    .status-open {
+      color: #7f5d00;
+      border-color: #f0d996;
+      background: #fff7df;
+    }
+
+    .status-done {
+      color: #0f6d49;
+      border-color: #bde6d4;
+      background: #e9f9f2;
+    }
+
+    .status-paid {
+      color: #0f6d49;
+      border-color: #bde6d4;
+      background: #e9f9f2;
+    }
+
+    .status-paired {
+      color: #1e5aa0;
+      border-color: #a8c5e9;
+      background: #e8f1fc;
+    }
+
+    .status-voided {
+      color: #666;
+      border-color: #ccc;
+      background: #f0f0f0;
+    }
+
+    .vat-total-display {
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #f8fafc;
+      font-weight: bold;
+    }
+
+    .dashboard-summary { grid-template-columns: repeat(3, 1fr); }
+    @media (max-width: 600px) {
+      .dashboard-summary { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 900px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+</head>
+<body>
+  <div class="app">
+    <div class="topbar">
+      <div>
+        <h1>El Contador – Finance Admin</h1>
+        <div class="small">Simple internal bookkeeping workspace for expenses, sales, bank transactions, and reconciliation.</div>
+      </div>
+    </div>
+
+    <nav class="tabs">
+      <button class="tab-btn active" data-tab="dashboard">Dashboard</button>
+      <button class="tab-btn" data-tab="expenses">Expenses</button>
+      <button class="tab-btn" data-tab="sales">Sales</button>
+      <button class="tab-btn" data-tab="bank">Bank Transactions</button>
+      <button class="tab-btn" data-tab="reconciliation">Reconciliation</button>
+      <button class="tab-btn" data-tab="customers">Customers</button>
+      <button class="tab-btn" data-tab="suppliers">Suppliers</button>
+      <button class="tab-btn" data-tab="vat-reports">VAT Reports</button>
+      <button class="tab-btn" data-tab="settings">Invoice settings</button>
+      <button class="tab-btn" data-tab="admin">Admin</button>
+    </nav>
+
+    <section id="tab-dashboard" class="tab-content">
+      <div class="panel">
+        <h2>Income vs expenses</h2>
+        <p class="small">Balance sheet by period. Filter by month, quarter, or year.</p>
+        <div class="dashboard-filters" style="display: flex; gap: 10px; align-items: center; margin-bottom: 16px; flex-wrap: wrap;">
+          <span>Group by:</span>
+          <button type="button" class="tab-btn dashboard-period active" data-period="month">Month</button>
+          <button type="button" class="tab-btn dashboard-period" data-period="quarter">Quarter</button>
+          <button type="button" class="tab-btn dashboard-period" data-period="year">Year</button>
+        </div>
+        <div class="dashboard-summary" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 20px;">
+          <div class="panel" style="margin: 0; padding: 14px;">
+            <div class="small">Income</div>
+            <div id="dashboardIncome" style="font-size: 22px; font-weight: bold;">0.00 EUR</div>
+          </div>
+          <div class="panel" style="margin: 0; padding: 14px;">
+            <div class="small">Expenses</div>
+            <div id="dashboardExpenses" style="font-size: 22px; font-weight: bold;">0.00 EUR</div>
+          </div>
+          <div class="panel" style="margin: 0; padding: 14px;">
+            <div class="small">Balance</div>
+            <div id="dashboardBalance" style="font-size: 22px; font-weight: bold;">0.00 EUR</div>
+          </div>
+        </div>
+        <div style="position: relative; height: 320px;">
+          <canvas id="dashboardChart"></canvas>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Cashflow on bank</h2>
+        <p class="small">Paired: incoming/outgoing gross (incl. VAT) from reconciled transactions. Bank balance: sum of all bank transactions.</p>
+        <div class="dashboard-summary" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 0;">
+          <div class="panel" style="margin: 0; padding: 14px;">
+            <div class="small">Incoming (gross)</div>
+            <div id="dashboardCashflowIncoming" style="font-size: 22px; font-weight: bold;">0.00 EUR</div>
+          </div>
+          <div class="panel" style="margin: 0; padding: 14px;">
+            <div class="small">Outgoing (gross)</div>
+            <div id="dashboardCashflowOutgoing" style="font-size: 22px; font-weight: bold;">0.00 EUR</div>
+          </div>
+          <div class="panel" style="margin: 0; padding: 14px;">
+            <div class="small">Cashflow (paired)</div>
+            <div id="dashboardCashflow" style="font-size: 22px; font-weight: bold;">0.00 EUR</div>
+          </div>
+          <div class="panel" style="margin: 0; padding: 14px;">
+            <div class="small">Bank balance</div>
+            <div id="dashboardBankBalance" style="font-size: 22px; font-weight: bold;">0.00 EUR</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Expense Analysis</h2>
+        <p class="small">Expenses by category for PnL reporting</p>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+          <div style="position: relative; height: 280px;">
+            <canvas id="expenseCategoryChart"></canvas>
+          </div>
+          <div>
+            <h3 style="margin-top: 0;">Top Expense Categories</h3>
+            <table style="font-size: 13px;">
+              <thead>
+                <tr>
+                  <th>Category</th>
+                  <th style="text-align: right;">Amount</th>
+                  <th style="text-align: right;">VAT</th>
+                </tr>
+              </thead>
+              <tbody id="dashboardExpenseCategories"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>VAT Overview</h2>
+        <p class="small">Current quarter: VAT charged on sales vs VAT on expenses (claimable). Net = pay or receive.</p>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px;">
+          <div class="panel" style="margin: 0; padding: 14px; border-left: 4px solid #2d66d7;">
+            <div class="small">VAT charged (sales)</div>
+            <div id="dashboardVatCharged" style="font-size: 18px; font-weight: bold; color: var(--danger);">0.00 EUR</div>
+            <div class="small" style="margin-top: 4px; color: var(--muted);">You owe this on sales</div>
+          </div>
+          <div class="panel" style="margin: 0; padding: 14px; border-left: 4px solid #159767;">
+            <div class="small">VAT on expenses (claimable)</div>
+            <div id="dashboardVatClaimable" style="font-size: 18px; font-weight: bold; color: var(--ok);">0.00 EUR</div>
+            <div class="small" style="margin-top: 4px; color: var(--muted);">You can claim this back</div>
+          </div>
+          <div class="panel" style="margin: 0; padding: 14px; border-left: 4px solid #687792;">
+            <div class="small">Net VAT position</div>
+            <div id="dashboardVatNet" style="font-size: 18px; font-weight: bold;">0.00 EUR</div>
+            <div id="dashboardVatStatus" class="small" style="margin-top: 4px; color: var(--muted);">Pay / Receive / Balanced</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-expenses" class="tab-content hidden">
+      <div class="panel">
+        <h2>New Expense</h2>
+        <form id="expenseForm">
+          <input type="hidden" id="expenseEditId" value="">
+          <div class="grid">
+            <div class="field">
+              <label for="expenseDate">Date</label>
+              <input id="expenseDate" type="date" required>
+            </div>
+            <div class="field">
+              <label for="expenseSupplierSelect">Select Supplier</label>
+              <select id="expenseSupplierSelect">
+                <option value="">-- Type or select supplier --</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="expenseVendor">Vendor</label>
+              <input id="expenseVendor" type="text" required placeholder="Supplier name">
+            </div>
+            <div class="field">
+              <label for="expenseCategory">Category *</label>
+              <select id="expenseCategory" required>
+                <option value="">-- Select category --</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="expenseAmount">Amount Net (EUR) *</label>
+              <input id="expenseAmount" type="number" step="0.01" required>
+            </div>
+            <div class="field">
+              <label for="expenseVatRate">VAT Rate (%)</label>
+              <select id="expenseVatRate">
+                <option value="0">0%</option>
+                <option value="9">9%</option>
+                <option value="21" selected>21%</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="expenseVat">VAT Amount (EUR) <span style="font-weight:normal;color:var(--muted)">(from rate or override)</span></label>
+              <input id="expenseVat" type="number" step="0.01" value="0">
+            </div>
+            <div class="field">
+              <label for="expenseFile">Receipt / Bill Upload</label>
+              <div style="display: flex; gap: 8px; align-items: flex-start;">
+                <input id="expenseFile" type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" style="flex: 1;">
+                <button type="button" id="btnPreviewExpenseFile" class="btn-secondary" style="white-space: nowrap; display: none;">
+                  Preview
+                </button>
+                <button type="button" id="btnExtractInvoice" class="btn-secondary" style="white-space: nowrap; display: none;">
+                  Extract Data
+                </button>
+              </div>
+              <div id="extractionStatus" class="small" style="margin-top: 4px; color: var(--muted);"></div>
+            </div>
+          </div>
+          <div class="field" style="margin-top: 12px;">
+            <label for="expenseInvoiceNumber">Invoice / Receipt number</label>
+            <input id="expenseInvoiceNumber" type="text" placeholder="e.g. INV-2024-001" style="max-width: 280px;">
+            <div id="expenseDuplicateWarning" class="small" style="margin-top: 6px; min-height: 1.2em;"></div>
+          </div>
+          <div class="field" style="margin-top: 12px;">
+            <label for="expenseNotes">Notes</label>
+            <textarea id="expenseNotes"></textarea>
+          </div>
+          <div class="actions">
+            <button type="submit" id="expenseSubmitBtn" class="btn-primary">Save Expense</button>
+            <button type="button" id="expenseFormEditCancel" class="btn-secondary" style="display: none;">Cancel</button>
+          </div>
+        </form>
+      </div>
+      <div class="panel">
+        <h2>Expenses List</h2>
+        <div class="field" style="margin-bottom: 12px; max-width: 320px;">
+          <label for="expenseSearch">Search</label>
+          <input id="expenseSearch" type="text" placeholder="Amount, supplier, invoice #, notes...">
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Vendor</th>
+              <th>Invoice #</th>
+              <th>Category</th>
+              <th>Net</th>
+              <th>VAT</th>
+              <th>Total</th>
+              <th>File</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="expenseRows"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="tab-sales" class="tab-content hidden">
+      <div class="panel">
+        <h2>New Sale / Invoice</h2>
+        <form id="saleForm">
+          <input type="hidden" id="saleEditId" value="">
+          <div class="grid">
+            <div class="field">
+              <label for="saleInvoiceNo">Invoice Number</label>
+              <input id="saleInvoiceNo" type="text" required placeholder="2026-001">
+            </div>
+            <div class="field">
+              <label for="saleCustomerSelect">Select Customer</label>
+              <select id="saleCustomerSelect">
+                <option value="">-- Type or select customer --</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="saleCustomer">Customer Name</label>
+              <input id="saleCustomer" type="text" required placeholder="Company or name">
+            </div>
+            <div class="field">
+              <label for="saleCustomerEmail">Customer email</label>
+              <input id="saleCustomerEmail" type="email" placeholder="billing@customer.com">
+            </div>
+            <div class="field">
+              <label for="saleIssueDate">Issue Date</label>
+              <input id="saleIssueDate" type="date" required>
+            </div>
+            <div class="field">
+              <label for="saleDueDate">Due Date</label>
+              <input id="saleDueDate" type="date" required>
+            </div>
+          </div>
+          <div class="field" style="margin-top: 12px;">
+            <label for="saleCustomerAddress">Customer address</label>
+            <textarea id="saleCustomerAddress" rows="2" placeholder="Street, postal code, city"></textarea>
+          </div>
+          <div class="field" style="margin-top: 12px;">
+            <label>Line items</label>
+            <div id="saleLinesContainer" class="sale-lines"></div>
+            <button type="button" id="saleAddLine" class="btn-secondary" style="margin-top: 8px;">Add another line</button>
+          </div>
+          <div class="sale-totals" style="margin-top: 12px; display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
+            <div><strong>Net amount:</strong> <span id="saleNetDisplay">0.00</span> EUR</div>
+            <div><strong>VAT:</strong> <span id="saleVatDisplay">0.00</span> EUR</div>
+            <div><strong>Total:</strong> <span id="saleTotalDisplay">0.00</span> EUR</div>
+          </div>
+          <div class="field" style="margin-top: 12px;">
+            <label for="saleFile">Invoice Document / Attachment (PDF, JPG, PNG)</label>
+            <input id="saleFile" type="file" accept=".pdf,.jpg,.jpeg,.png,.webp">
+            <div class="small" style="margin-top: 4px;">Upload scanned invoice, receipt, or related document</div>
+          </div>
+          <div class="actions" style="margin-top: 12px;">
+            <button type="submit" id="saleSubmitBtn" class="btn-primary">Save Invoice</button>
+            <button type="button" id="saleFormEditCancel" class="btn-secondary" style="display: none;">Cancel</button>
+          </div>
+        </form>
+      </div>
+      <div class="panel">
+        <h2>Sales / Invoices</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Invoice</th>
+              <th>Customer</th>
+              <th>Issue / Due</th>
+              <th>Total</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="saleRows"></tbody>
+        </table>
+      </div>
+
+      <div id="saleEditModal" class="modal-overlay hidden">
+        <div class="panel sale-edit-panel" style="max-width: 480px; width: 100%; margin: 16px;">
+          <h2>Edit invoice</h2>
+          <form id="saleEditForm">
+            <input type="hidden" id="saleEditId">
+            <div class="field">
+              <label for="saleEditInvoiceNo">Invoice number</label>
+              <input id="saleEditInvoiceNo" type="text" required>
+            </div>
+            <div class="field">
+              <label for="saleEditCustomer">Customer</label>
+              <input id="saleEditCustomer" type="text" required>
+            </div>
+            <div class="field">
+              <label for="saleEditCustomerEmail">Customer email</label>
+              <input id="saleEditCustomerEmail" type="email">
+            </div>
+            <div class="field">
+              <label for="saleEditCustomerAddress">Customer address</label>
+              <textarea id="saleEditCustomerAddress" rows="2"></textarea>
+            </div>
+            <div class="field">
+              <label for="saleEditIssueDate">Issue date</label>
+              <input id="saleEditIssueDate" type="date" required>
+            </div>
+            <div class="field">
+              <label for="saleEditDueDate">Due date</label>
+              <input id="saleEditDueDate" type="date" required>
+            </div>
+            <div id="saleEditError" class="small" style="color: var(--danger); margin-top: 8px; display: none;"></div>
+            <div class="actions" style="margin-top: 12px;">
+              <button type="submit" class="btn-primary">Save</button>
+              <button type="button" id="saleEditCancel" class="btn-secondary">Cancel</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div id="changePasswordModal" class="modal-overlay hidden">
+        <div class="panel" style="max-width: 400px; width: 100%; margin: 16px;">
+          <h2>Change password</h2>
+          <form id="changePasswordForm">
+            <div class="field">
+              <label for="changePasswordCurrent">Current password</label>
+              <input id="changePasswordCurrent" type="password" required autocomplete="current-password">
+            </div>
+            <div class="field">
+              <label for="changePasswordNew">New password</label>
+              <input id="changePasswordNew" type="password" required minlength="8" autocomplete="new-password">
+            </div>
+            <div class="field">
+              <label for="changePasswordConfirm">Confirm new password</label>
+              <input id="changePasswordConfirm" type="password" required minlength="8" autocomplete="new-password">
+            </div>
+            <p id="changePasswordError" class="small" style="color: var(--danger); margin-top: 8px; display: none;"></p>
+            <div class="actions" style="margin-top: 12px;">
+              <button type="submit" class="btn-primary">Update password</button>
+              <button type="button" id="changePasswordCancel" class="btn-secondary">Cancel</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-vat-reports" class="tab-content hidden">
+      <div class="panel">
+        <h2>VAT Reports & Quarterly Returns</h2>
+        <p class="small">Track VAT to pay (from sales) and VAT to claim (from expenses). Generate quarterly reports for tax filing.</p>
+      </div>
+
+      <div class="panel">
+        <div style="display: flex; gap: 16px; align-items: center; margin-bottom: 16px; flex-wrap: wrap;">
+          <div class="field" style="min-width: 120px;">
+            <label for="vatYear">Year</label>
+            <select id="vatYear">
+              <option value="2025">2025</option>
+              <option value="2026" selected>2026</option>
+              <option value="2027">2027</option>
+            </select>
+          </div>
+          <div class="field" style="min-width: 120px;">
+            <label for="vatQuarter">Quarter</label>
+            <select id="vatQuarter">
+              <option value="1">Q1 (Jan-Mar)</option>
+              <option value="2">Q2 (Apr-Jun)</option>
+              <option value="3" selected>Q3 (Jul-Sep)</option>
+              <option value="4">Q4 (Oct-Dec)</option>
+            </select>
+          </div>
+          <button type="button" id="vatLoadBtn" class="btn-primary" style="margin-top: 22px;">Load Report</button>
+        </div>
+
+        <div id="vatSummary" style="display: none;">
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-bottom: 24px;">
+            <div class="panel" style="margin: 0; padding: 14px; border-left: 4px solid #2d66d7;">
+              <div class="small">VAT from Sales (to pay)</div>
+              <div id="vatSalesAmount" style="font-size: 20px; font-weight: bold; color: var(--danger);">0.00 EUR</div>
+            </div>
+            <div class="panel" style="margin: 0; padding: 14px; border-left: 4px solid #159767;">
+              <div class="small">VAT from Expenses (to claim)</div>
+              <div id="vatExpensesAmount" style="font-size: 20px; font-weight: bold; color: var(--ok);">0.00 EUR</div>
+            </div>
+            <div class="panel" style="margin: 0; padding: 14px; border-left: 4px solid #687792;">
+              <div class="small">Net VAT Position</div>
+              <div id="vatNetPosition" style="font-size: 20px; font-weight: bold;">0.00 EUR</div>
+              <div id="vatStatus" style="font-size: 12px; margin-top: 4px;"></div>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px;">
+            <div class="panel" style="margin: 0;">
+              <h3 style="margin-top: 0;">Sales Summary</h3>
+              <table style="font-size: 13px;">
+                <tbody>
+                  <tr><td>Net Sales</td><td id="vatSalesNet" style="text-align: right; font-weight: bold;">0.00</td></tr>
+                  <tr><td>VAT Amount</td><td id="vatSalesVat" style="text-align: right; color: var(--danger);">0.00</td></tr>
+                  <tr><td>Gross Sales</td><td id="vatSalesGross" style="text-align: right; font-weight: bold;">0.00</td></tr>
+                  <tr><td>Invoice Count</td><td id="vatInvoiceCount" style="text-align: right;">0</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="panel" style="margin: 0;">
+              <h3 style="margin-top: 0;">Expenses Summary</h3>
+              <table style="font-size: 13px;">
+                <tbody>
+                  <tr><td>Net Expenses</td><td id="vatExpensesNet" style="text-align: right; font-weight: bold;">0.00</td></tr>
+                  <tr><td>VAT Amount</td><td id="vatExpensesVat" style="text-align: right; color: var(--ok);">0.00</td></tr>
+                  <tr><td>Total Expenses</td><td id="vatExpensesTotal" style="text-align: right; font-weight: bold;">0.00</td></tr>
+                  <tr><td>Expense Count</td><td id="vatExpenseCount" style="text-align: right;">0</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="panel" style="margin-top: 16px;">
+            <h3 style="margin-top: 0;">Expense Breakdown by Category</h3>
+            <div style="position: relative; height: 300px; margin-bottom: 20px;">
+              <canvas id="vatCategoryChart"></canvas>
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Category</th>
+                  <th>Transactions</th>
+                  <th>Net Amount</th>
+                  <th>VAT</th>
+                  <th>Total</th>
+                </tr>
+              </thead>
+              <tbody id="vatCategoryRows"></tbody>
+            </table>
+          </div>
+
+          <div class="panel" style="margin-top: 16px;">
+            <h3 style="margin-top: 0;">Monthly Breakdown</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th>Month</th>
+                  <th>VAT from Sales</th>
+                  <th>VAT from Expenses</th>
+                  <th>Net Position</th>
+                </tr>
+              </thead>
+              <tbody id="vatMonthlyRows"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>Yearly VAT Overview</h3>
+        <div id="vatYearlySummary">
+          <p class="small">Select a year to view all quarterly summaries</p>
+        </div>
+        <div style="position: relative; height: 250px; margin-top: 16px;">
+          <canvas id="vatYearlyChart"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-settings" class="tab-content hidden">
+      <div class="panel">
+        <h2>Invoice / company details</h2>
+        <p class="small">Used on every PDF invoice: header, footer, VAT number, company number, address.</p>
+        <div class="panel" style="margin-bottom: 16px;">
+          <h3 style="margin-top:0;">Company logo</h3>
+          <div style="display:flex; align-items: center; gap: 16px; flex-wrap: wrap;">
+            <div id="invoiceLogoPreview" style="min-width:80px; min-height:50px; border:1px solid var(--line); border-radius:8px; display:flex; align-items:center; justify-content:center; background:#f8fafc;">
+              <img id="invoiceLogoImg" src="" alt="" style="max-width:80px; max-height:50px; object-fit:contain; display:none;">
+              <span id="invoiceLogoNone" class="small">No logo</span>
+            </div>
+            <div>
+              <input type="file" id="cfgLogoFile" accept="image/png,image/jpeg,image/jpg">
+              <button type="button" id="cfgLogoUpload" class="btn-primary" style="margin-top:8px;">Upload logo</button>
+            </div>
+          </div>
+        </div>
+        <form id="invoiceSettingsForm">
+          <div class="grid">
+            <div class="field">
+              <label for="cfgCompanyName">Company name</label>
+              <input id="cfgCompanyName" type="text" placeholder="Your Company">
+            </div>
+            <div class="field">
+              <label for="cfgTagline">Tagline (under name)</label>
+              <input id="cfgTagline" type="text" placeholder="Finance Administration">
+            </div>
+            <div class="field">
+              <label for="cfgEmail">Email</label>
+              <input id="cfgEmail" type="email" placeholder="billing@example.com">
+            </div>
+            <div class="field">
+              <label for="cfgVatNumber">VAT number</label>
+              <input id="cfgVatNumber" type="text" placeholder="NL123456789B01">
+            </div>
+            <div class="field">
+              <label for="cfgCompanyNumber">Company number (KvK)</label>
+              <input id="cfgCompanyNumber" type="text" placeholder="12345678">
+            </div>
+          </div>
+          <div class="field" style="margin-top: 12px;">
+            <label for="cfgAddress">Address (multiline)</label>
+            <textarea id="cfgAddress" rows="3" placeholder="Street, postal code, city"></textarea>
+          </div>
+          <div class="field" style="margin-top: 12px;">
+            <label for="cfgFooter">Footer (multi-line)</label>
+            <textarea id="cfgFooter" rows="4" placeholder="Thank you for your business.&#10;Payment within 14 days.&#10;EU payments: NL69ABNA0884756785"></textarea>
+          </div>
+          <div class="actions" style="margin-top: 12px;">
+            <button type="submit" class="btn-primary">Save invoice settings</button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <section id="tab-admin" class="tab-content hidden">
+      <div class="panel">
+        <h2>Account &amp; users</h2>
+        <p class="small">Change your password, sign out, or create a new admin user.</p>
+        <div class="actions" style="margin-top: 12px;">
+          <button id="btnChangePassword" type="button" class="btn-secondary">Change password</button>
+          <button id="btnLogout" type="button">Log out</button>
+          <button id="btnCreateUser" type="button" class="btn-primary">Create new user</button>
+        </div>
+      </div>
+
+      <div id="createUserModal" class="modal-overlay hidden">
+        <div class="panel" style="max-width: 400px; width: 100%; margin: 16px;">
+          <h2>Create new user</h2>
+          <form id="createUserForm">
+            <div class="field">
+              <label for="createUserEmail">Email</label>
+              <input id="createUserEmail" type="email" required placeholder="user@example.com">
+            </div>
+            <div class="field">
+              <label for="createUserPassword">Password</label>
+              <input id="createUserPassword" type="password" required minlength="8" autocomplete="new-password">
+            </div>
+            <div class="field">
+              <label for="createUserPasswordConfirm">Confirm password</label>
+              <input id="createUserPasswordConfirm" type="password" required minlength="8" autocomplete="new-password">
+            </div>
+            <p id="createUserError" class="small" style="color: var(--danger); margin-top: 8px; display: none;"></p>
+            <div class="actions" style="margin-top: 12px;">
+              <button type="submit" class="btn-primary">Create user</button>
+              <button type="button" id="createUserCancel" class="btn-secondary">Cancel</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-bank" class="tab-content hidden">
+      <div class="panel">
+        <h2>New Bank Transaction</h2>
+        <form id="bankForm">
+          <div class="grid">
+            <div class="field">
+              <label for="bankDate">Date</label>
+              <input id="bankDate" type="date" required>
+            </div>
+            <div class="field">
+              <label for="bankType">Type</label>
+              <select id="bankType" required>
+                <option value="in">Money In</option>
+                <option value="out">Money Out</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="bankAmount">Amount (EUR)</label>
+              <input id="bankAmount" type="number" step="0.01" required>
+            </div>
+            <div class="field">
+              <label for="bankReference">Reference</label>
+              <input id="bankReference" type="text" placeholder="Statement reference">
+            </div>
+          </div>
+          <div class="field" style="margin-top: 12px;">
+            <label for="bankDescription">Description</label>
+            <textarea id="bankDescription" required></textarea>
+          </div>
+          <div class="actions">
+            <button type="submit" class="btn-primary">Save Transaction</button>
+          </div>
+        </form>
+      </div>
+      <div class="panel">
+        <h2>Import from CSV</h2>
+        <p class="small">Upload a CSV with columns: date, type, amount, description, reference (or same order without header). Date: YYYY-MM-DD or DD/MM/YYYY. Type: in/out or credit/debit.</p>
+        <div class="actions">
+          <input type="file" id="bankCsvFile" accept=".csv,text/csv,text/plain">
+          <button type="button" id="bankCsvImport" class="btn-primary">Import CSV</button>
+        </div>
+        <p id="bankCsvResult" class="small" style="margin-top:8px;"></p>
+      </div>
+      <div class="panel">
+        <h2>Bank Transactions</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Type</th>
+              <th>Description</th>
+              <th>Amount</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="bankRows"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="tab-reconciliation" class="tab-content hidden">
+      <div class="panel">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+          <div>
+            <h2 style="margin: 0;">Reconciliation</h2>
+            <div class="small">Match bank transactions with invoices and expenses. Select items below and use Match selected.</div>
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <button type="button" id="reconViewOpen" class="tab-btn active" data-view="open">Open Items</button>
+            <button type="button" id="reconViewPaired" class="tab-btn" data-view="paired">Paired Items</button>
+          </div>
+        </div>
+      </div>
+      <div id="reconOpenPanel" class="panel">
+        <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 12px;">
+          <button type="button" id="reconMatchSelected" class="btn-primary" disabled>Match selected</button>
+          <span id="reconSelectionStatus" class="small" style="color: var(--muted);">Select one bank transaction and one or more expenses (Money Out) or one invoice (Money In). Difference must be within 0.50 EUR; any small difference is recorded as an adjustment.</span>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th style="width: 40px;"></th>
+              <th>Type</th>
+              <th>Date</th>
+              <th>Description / Vendor / Customer</th>
+              <th style="text-align: right;">Amount (EUR)</th>
+            </tr>
+          </thead>
+          <tbody id="reconRows"></tbody>
+        </table>
+      </div>
+      <div id="reconPairedPanel" class="panel hidden">
+        <table>
+          <thead>
+            <tr>
+              <th>Bank Transaction</th>
+              <th>Match Info</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="reconPairedRows"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="tab-customers" class="tab-content hidden">
+      <div class="panel">
+        <h2>New Customer</h2>
+        <form id="customerForm">
+          <div class="grid">
+            <div class="field">
+              <label for="customerName">Name *</label>
+              <input id="customerName" type="text" required placeholder="Company or customer name">
+            </div>
+            <div class="field">
+              <label for="customerEmail">Email</label>
+              <input id="customerEmail" type="email" placeholder="customer@example.com">
+            </div>
+            <div class="field">
+              <label for="customerPhone">Phone</label>
+              <input id="customerPhone" type="text" placeholder="+31 ...">
+            </div>
+            <div class="field">
+              <label for="customerVatNumber">VAT Number</label>
+              <input id="customerVatNumber" type="text" placeholder="NL123456789B01">
+            </div>
+            <div class="field">
+              <label for="customerCompanyNumber">Company Number (KvK)</label>
+              <input id="customerCompanyNumber" type="text" placeholder="12345678">
+            </div>
+          </div>
+          <div class="field" style="margin-top: 12px;">
+            <label for="customerAddress">Address</label>
+            <textarea id="customerAddress" rows="3" placeholder="Street, postal code, city, country"></textarea>
+          </div>
+          <div class="field" style="margin-top: 12px;">
+            <label for="customerNotes">Notes</label>
+            <textarea id="customerNotes" rows="2" placeholder="Additional information..."></textarea>
+          </div>
+          <div class="actions">
+            <button type="submit" class="btn-primary">Save Customer</button>
+          </div>
+        </form>
+      </div>
+      <div class="panel">
+        <h2>Customers List</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Phone</th>
+              <th>VAT Number</th>
+              <th>Address</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="customerRows"></tbody>
+        </table>
+      </div>
+
+      <div id="customerEditModal" class="modal-overlay hidden">
+        <div class="panel" style="max-width: 480px; width: 100%; margin: 16px;">
+          <h2>Edit Customer</h2>
+          <form id="customerEditForm">
+            <input type="hidden" id="customerEditId">
+            <div class="field">
+              <label for="customerEditName">Name *</label>
+              <input id="customerEditName" type="text" required>
+            </div>
+            <div class="field">
+              <label for="customerEditEmail">Email</label>
+              <input id="customerEditEmail" type="email">
+            </div>
+            <div class="field">
+              <label for="customerEditPhone">Phone</label>
+              <input id="customerEditPhone" type="text">
+            </div>
+            <div class="field">
+              <label for="customerEditVatNumber">VAT Number</label>
+              <input id="customerEditVatNumber" type="text">
+            </div>
+            <div class="field">
+              <label for="customerEditCompanyNumber">Company Number</label>
+              <input id="customerEditCompanyNumber" type="text">
+            </div>
+            <div class="field">
+              <label for="customerEditAddress">Address</label>
+              <textarea id="customerEditAddress" rows="3"></textarea>
+            </div>
+            <div class="field">
+              <label for="customerEditNotes">Notes</label>
+              <textarea id="customerEditNotes" rows="2"></textarea>
+            </div>
+            <div id="customerEditError" class="small" style="color: var(--danger); margin-top: 8px; display: none;"></div>
+            <div class="actions" style="margin-top: 12px;">
+              <button type="submit" class="btn-primary">Save</button>
+              <button type="button" id="customerEditCancel" class="btn-secondary">Cancel</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-suppliers" class="tab-content hidden">
+      <div class="panel">
+        <h2>New Supplier</h2>
+        <form id="supplierForm">
+          <div class="grid">
+            <div class="field">
+              <label for="supplierName">Name *</label>
+              <input id="supplierName" type="text" required placeholder="Supplier name">
+            </div>
+            <div class="field">
+              <label for="supplierEmail">Email</label>
+              <input id="supplierEmail" type="email" placeholder="supplier@example.com">
+            </div>
+            <div class="field">
+              <label for="supplierPhone">Phone</label>
+              <input id="supplierPhone" type="text" placeholder="+31 ...">
+            </div>
+            <div class="field">
+              <label for="supplierVatNumber">VAT Number</label>
+              <input id="supplierVatNumber" type="text" placeholder="NL123456789B01">
+            </div>
+            <div class="field">
+              <label for="supplierCompanyNumber">Company Number (KvK)</label>
+              <input id="supplierCompanyNumber" type="text" placeholder="12345678">
+            </div>
+            <div class="field">
+              <label for="supplierCategory">Default expense category</label>
+              <select id="supplierCategory">
+                <option value="">-- No default category --</option>
+              </select>
+            </div>
+          </div>
+          <div class="field" style="margin-top: 12px;">
+            <label for="supplierAddress">Address</label>
+            <textarea id="supplierAddress" rows="3" placeholder="Street, postal code, city, country"></textarea>
+          </div>
+          <div class="field" style="margin-top: 12px;">
+            <label for="supplierNotes">Notes</label>
+            <textarea id="supplierNotes" rows="2" placeholder="Additional information..."></textarea>
+          </div>
+          <div class="actions">
+            <button type="submit" class="btn-primary">Save Supplier</button>
+          </div>
+        </form>
+      </div>
+      <div class="panel">
+        <h2>Suppliers List</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Category</th>
+              <th>Email</th>
+              <th>Phone</th>
+              <th>VAT Number</th>
+              <th>Address</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="supplierRows"></tbody>
+        </table>
+      </div>
+
+      <div id="supplierEditModal" class="modal-overlay hidden">
+        <div class="panel" style="max-width: 480px; width: 100%; margin: 16px;">
+          <h2>Edit Supplier</h2>
+          <form id="supplierEditForm">
+            <input type="hidden" id="supplierEditId">
+            <div class="field">
+              <label for="supplierEditName">Name *</label>
+              <input id="supplierEditName" type="text" required>
+            </div>
+            <div class="field">
+              <label for="supplierEditEmail">Email</label>
+              <input id="supplierEditEmail" type="email">
+            </div>
+            <div class="field">
+              <label for="supplierEditPhone">Phone</label>
+              <input id="supplierEditPhone" type="text">
+            </div>
+            <div class="field">
+              <label for="supplierEditVatNumber">VAT Number</label>
+              <input id="supplierEditVatNumber" type="text">
+            </div>
+            <div class="field">
+              <label for="supplierEditCompanyNumber">Company Number</label>
+              <input id="supplierEditCompanyNumber" type="text">
+            </div>
+            <div class="field">
+              <label for="supplierEditCategory">Default expense category</label>
+              <select id="supplierEditCategory">
+                <option value="">-- No default category --</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="supplierEditAddress">Address</label>
+              <textarea id="supplierEditAddress" rows="3"></textarea>
+            </div>
+            <div class="field">
+              <label for="supplierEditNotes">Notes</label>
+              <textarea id="supplierEditNotes" rows="2"></textarea>
+            </div>
+            <div id="supplierEditError" class="small" style="color: var(--danger); margin-top: 8px; display: none;"></div>
+            <div class="actions" style="margin-top: 12px;">
+              <button type="submit" class="btn-primary">Save</button>
+              <button type="button" id="supplierEditCancel" class="btn-secondary">Cancel</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <div id="pdfViewerModal" class="modal-overlay hidden">
+      <div class="panel" style="max-width: 95vw; max-height: 95vh; width: 950px; height: 90vh; margin: 16px; display: flex; flex-direction: column;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <h2 style="margin: 0;">Document Preview</h2>
+          <button type="button" id="pdfViewerClose" class="btn-secondary">Close</button>
+        </div>
+        <div id="pdfViewerContainer" style="flex: 1; overflow: auto; border: 1px solid var(--line); border-radius: 8px; background: #f8fafc; position: relative;">
+          <object id="pdfViewerObject" type="application/pdf" style="width: 100%; height: 100%; display: none;">
+            <div style="padding: 40px; text-align: center;">
+              <p>Unable to display PDF. Use the download button below.</p>
+            </div>
+          </object>
+          <img id="pdfViewerImage" style="max-width: 100%; height: auto; display: none; margin: 0 auto;" alt="Document preview">
+          <div id="pdfViewerPlaceholder" style="padding: 40px; text-align: center; color: var(--muted);">
+            <div style="font-size: 48px; margin-bottom: 16px;">📄</div>
+            <div>Loading document...</div>
+          </div>
+        </div>
+        <div style="margin-top: 12px; display: flex; gap: 10px; justify-content: space-between; align-items: center;">
+          <div id="pdfViewerFileName" class="small" style="color: var(--muted);"></div>
+          <a id="pdfViewerDownload" href="#" target="_blank" class="btn-primary" style="text-decoration: none; display: inline-block; padding: 10px 14px;">Download</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const data = { expenses: [], sales: [], bankTransactions: [], customers: [], suppliers: [], expenseCategories: [] };
+    let invoiceConfig = {
+      companyName: 'El Contador',
+      tagline: 'Finance Administration',
+      address: '',
+      vatNumber: '',
+      companyNumber: '',
+      email: 'billing@example.com',
+      footer: '',
+      logoPath: '',
+    };
+    let dashboardChartInstance = null;
+    let expenseCategoryChartInstance = null;
+    let vatCategoryChartInstance = null;
+    let vatYearlyChartInstance = null;
+    let dashboardPeriod = 'month';
+    let expenseSearchTerm = '';
+
+    async function apiGet(path) {
+      const r = await fetch(path, { credentials: "same-origin" });
+      if (r.status === 401) {
+        window.location.href = "/login";
+        throw new Error("Unauthorized");
+      }
+      if (!r.ok) throw new Error(await r.text());
+      return r.json();
+    }
+
+    async function apiPost(path, body) {
+      const r = await fetch(path, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        credentials: "same-origin",
+      });
+      if (r.status === 401) {
+        window.location.href = "/login";
+        throw new Error("Unauthorized");
+      }
+      if (!r.ok) throw new Error(await r.text());
+      return r.json();
+    }
+
+    async function apiPut(path, body) {
+      const r = await fetch(path, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        credentials: "same-origin",
+      });
+      if (r.status === 401) {
+        window.location.href = "/login";
+        throw new Error("Unauthorized");
+      }
+      if (!r.ok) throw new Error(await r.text());
+      return r.json();
+    }
+
+    async function apiPostForm(path, formData) {
+      const r = await fetch(path, {
+        method: "POST",
+        body: formData,
+        credentials: "same-origin",
+      });
+      if (r.status === 401) {
+        window.location.href = "/login";
+        throw new Error("Unauthorized");
+      }
+      if (!r.ok) throw new Error(await r.text());
+      return r.json();
+    }
+
+    async function apiDelete(path) {
+      const r = await fetch(path, {
+        method: "DELETE",
+        credentials: "same-origin",
+      });
+      if (r.status === 401) {
+        window.location.href = "/login";
+        throw new Error("Unauthorized");
+      }
+      if (!r.ok) throw new Error(await r.text());
+      return r.json();
+    }
+
+    function money(n) {
+      return "EUR " + Number(n || 0).toFixed(2);
+    }
+
+    function daysBetween(dateA, dateB) {
+      const a = new Date(dateA);
+      const b = new Date(dateB);
+      const one = 24 * 60 * 60 * 1000;
+      return Math.abs(Math.round((a.getTime() - b.getTime()) / one));
+    }
+
+    function statusPill(status) {
+      if (status === true || status === 'reconciled') {
+        return '<span class="status-pill status-done">Reconciled</span>';
+      }
+      if (status === 'paid') {
+        return '<span class="status-pill status-paid">Paid</span>';
+      }
+      if (status === 'paired') {
+        return '<span class="status-pill status-paired">Paired</span>';
+      }
+      if (status === 'voided') {
+        return '<span class="status-pill status-voided">Voided</span>';
+      }
+      return '<span class="status-pill status-open">Open</span>';
+    }
+
+    function renderExpenses() {
+      const rows = document.getElementById("expenseRows");
+      rows.innerHTML = "";
+      data.expenses
+        .slice()
+        .sort((a, b) => new Date(b.date) - new Date(a.date))
+        .forEach((item) => {
+          const tr = document.createElement("tr");
+          const categoryDisplay = item.categoryName || item.category || "-";
+          const totalAmount = (Number(item.amount) || 0) + (Number(item.vat) || 0);
+
+          let fileCell = "-";
+          if (item.fileName) {
+            fileCell = `
+              <button type="button" data-action="preview-file" data-id="${item.id}" class="btn-ok" style="padding: 4px 8px; font-size: 12px;">Preview</button>
+              <a href="/api/expenses/${item.id}/file" target="_blank" rel="noopener" style="margin-left: 4px; font-size: 12px;">Download</a>
+            `;
+          }
+
+          // Status: Paid or Edit button for open (unreconciled) expenses
+          const statusHtml = item.reconciled ? statusPill('paid') : `<button data-action="edit-expense" data-id="${item.id}" class="btn-ok">Edit</button>`;
+
+          const invoiceNum = item.invoiceNumber ?? item.invoice_number ?? "-";
+          tr.innerHTML = `
+            <td>${item.date}</td>
+            <td>${item.vendor}</td>
+            <td style="min-width: 100px;">${invoiceNum}</td>
+            <td>${categoryDisplay}</td>
+            <td>${money(item.amount)}</td>
+            <td>${money(item.vat)}</td>
+            <td>${money(totalAmount)}</td>
+            <td>${fileCell}</td>
+            <td>${statusHtml}</td>
+            <td>
+              <button data-action="delete-expense" data-id="${item.id}" class="btn-danger" style="padding: 4px 8px; font-size: 12px;">Delete</button>
+            </td>
+          `;
+          rows.appendChild(tr);
+        });
+    }
+
+    function renderSales() {
+      const rows = document.getElementById("saleRows");
+      rows.innerHTML = "";
+      data.sales
+        .slice()
+        .sort((a, b) => new Date(b.issueDate) - new Date(a.issueDate))
+        .forEach((sale) => {
+          const tr = document.createElement("tr");
+
+          // Status: Paid, Voided, or Edit button for open invoices
+          let statusHtml;
+          if (sale.voided) {
+            statusHtml = statusPill('voided');
+          } else if (sale.reconciled) {
+            statusHtml = statusPill('paid');
+          } else {
+            statusHtml = `<button data-action="edit" data-id="${sale.id}" class="btn-ok">Edit</button>`;
+          }
+
+          const voidBtn = sale.voided || sale.reconciled ? '' : `<button data-action="void" data-id="${sale.id}" class="btn-danger">Void</button>`;
+
+          // Add payment info if reconciled
+          let paymentInfo = "";
+          if (sale.reconciled && !sale.voided) {
+            paymentInfo = `<div class="small" style="color: var(--ok);">Payment received</div>`;
+          }
+
+          // Add file preview button if invoice has attachment
+          let fileCell = "";
+          if (sale.fileName) {
+            fileCell = `<button data-action="preview-file" data-id="${sale.id}" class="btn-ok" style="padding: 4px 8px; font-size: 12px; margin-right: 4px;">View File</button>`;
+          }
+
+          tr.innerHTML = `
+            <td>${sale.invoiceNo}</td>
+            <td>${sale.customer}</td>
+            <td>
+              ${(sale.issueDate || "").toString().slice(0, 10)}<br>${(sale.dueDate || "").toString().slice(0, 10)}
+              ${paymentInfo}
+            </td>
+            <td>${money(sale.total)}</td>
+            <td>${statusHtml}</td>
+            <td>
+              ${voidBtn}
+              ${fileCell}
+              <button data-action="pdf" data-id="${sale.id}" class="btn-ok">PDF</button>
+            </td>
+          `;
+          if (sale.voided) tr.style.opacity = "0.7";
+          rows.appendChild(tr);
+        });
+    }
+
+    function renderBank() {
+      const rows = document.getElementById("bankRows");
+      rows.innerHTML = "";
+      data.bankTransactions
+        .slice()
+        .sort((a, b) => new Date(b.date) - new Date(a.date))
+        .forEach((tx) => {
+          const tr = document.createElement("tr");
+
+          // Build status and match info
+          let statusHtml = statusPill(tx.reconciled ? 'paired' : false);
+          let matchInfo = "";
+
+          if (tx.reconciled && tx.reconciliationRefId) {
+            // Look up the matched item
+            let matchedItem = null;
+            let matchedType = "";
+            if (tx.reconciliationRefType === 'expense') {
+              matchedItem = data.expenses.find(e => e.id === tx.reconciliationRefId);
+              matchedType = "Expense";
+            } else if (tx.reconciliationRefType === 'sale') {
+              matchedItem = data.sales.find(s => s.id === tx.reconciliationRefId);
+              matchedType = "Invoice";
+            }
+
+            if (matchedItem) {
+              const ref = matchedType === "Expense" ? matchedItem.vendor : matchedItem.invoiceNo || matchedItem.customer;
+              matchInfo = `<div class="small" style="margin-top: 4px; color: var(--accent);">Paired with ${matchedType}: ${ref}</div>`;
+            }
+          }
+
+          const bankIsIn = tx.type === "in";
+          const bankArrow = bankIsIn ? "&#8593;" : "&#8595;";
+          const bankColor = bankIsIn ? "var(--recon-in)" : "var(--recon-out)";
+          const bankLabel = bankIsIn ? "Money In" : "Money Out";
+          tr.innerHTML = `
+            <td>${tx.date}</td>
+            <td><span style="color: ${bankColor}; font-weight: 600;"><span style="font-weight: bold;">${bankArrow}</span> ${bankLabel}</span></td>
+            <td>
+              ${tx.description}
+              ${matchInfo}
+            </td>
+            <td>${money(tx.amount)}</td>
+            <td>${statusHtml}</td>
+          `;
+          rows.appendChild(tr);
+        });
+    }
+
+    function getSuggestions(tx) {
+      const candidates = tx.type === "out" ? data.expenses : data.sales.filter((s) => !s.voided);
+      return candidates
+        .filter((item) => !item.reconciled)
+        .map((item) => {
+          const itemDate = tx.type === "out" ? item.date : item.issueDate;
+          // Bank "out" is gross (amount + vat); sales have total; expenses have amount + vat
+          const itemAmount = tx.type === "out"
+            ? (Number(item.amount) || 0) + (Number(item.vat) || 0)
+            : Number(item.amount || item.total);
+          const amountDiff = Math.abs(itemAmount - Number(tx.amount));
+          const dateDiff = daysBetween(itemDate, tx.date);
+          return { item, amountDiff, dateDiff };
+        })
+        .filter((x) => x.amountDiff <= 0.01 && x.dateDiff <= 45)
+        .sort((a, b) => a.dateDiff - b.dateDiff)
+        .slice(0, 3);
+    }
+
+    async function reconcile(txId, targetId, targetType) {
+      await apiPost("/api/reconciliation/match", {
+        bankTransactionId: txId,
+        targetId,
+        targetType,
+      });
+      const tx = data.bankTransactions.find((x) => x.id === txId);
+      const list = targetType === "expense" ? data.expenses : data.sales;
+      const target = list.find((x) => x.id === targetId);
+      if (tx) {
+        tx.reconciled = true;
+        tx.reconciliationRefType = targetType;
+        tx.reconciliationRefId = targetId;
+        tx.reconciledAt = new Date().toISOString();
+      }
+      if (target) {
+        target.reconciled = true;
+        target.reconciledAt = new Date().toISOString();
+      }
+      renderAll();
+    }
+
+    async function reconcileMulti(txId, expenseIds) {
+      await apiPost("/api/reconciliation/match-expenses", {
+        bankTransactionId: txId,
+        expenseIds,
+      });
+      await loadAll();
+    }
+
+    async function unmatchTransaction(txId) {
+      await apiPost("/api/reconciliation/unmatch", { bankTransactionId: txId });
+      await loadAll();
+    }
+
+    function updateMultiMatchSum(container) {
+      const block = container.closest(".multi-match");
+      if (!block) return;
+      const txAmount = Number(block.dataset.txAmount) || 0;
+      const checkboxes = block.querySelectorAll(".multi-expense-cb:checked");
+      let sum = 0;
+      checkboxes.forEach((cb) => { sum += Number(cb.dataset.expenseTotal) || 0; });
+      const sumEl = block.querySelector(".multi-sum");
+      const btn = block.querySelector("[data-action='match-combined']");
+      if (sumEl) sumEl.textContent = sum.toFixed(2);
+      if (btn) btn.disabled = Math.abs(sum - txAmount) > 0.02 || checkboxes.length === 0;
+    }
+
+    let reconciliationView = 'open'; // 'open' or 'paired'
+
+    function renderReconciliation() {
+      const openPanel = document.getElementById("reconOpenPanel");
+      const pairedPanel = document.getElementById("reconPairedPanel");
+      const openRows = document.getElementById("reconRows");
+      const pairedRows = document.getElementById("reconPairedRows");
+
+      if (reconciliationView === 'open') {
+        if (openPanel) openPanel.classList.remove("hidden");
+        if (pairedPanel) pairedPanel.classList.add("hidden");
+        if (!openRows) return;
+
+        openRows.innerHTML = "";
+        const openBank = data.bankTransactions.filter((tx) => !tx.reconciled);
+        const openExpenses = data.expenses.filter((e) => !e.reconciled);
+        const openSales = data.sales.filter((s) => !s.voided && !s.reconciled);
+
+        const items = [
+          ...openBank.map((tx) => ({
+            type: "bank",
+            id: tx.id,
+            date: tx.date,
+            desc: tx.description,
+            amount: Number(tx.amount),
+            inOut: tx.type,
+          })),
+          ...openExpenses.map((e) => ({
+            type: "expense",
+            id: e.id,
+            date: e.date,
+            desc: e.vendor,
+            amount: (Number(e.amount) || 0) + (Number(e.vat) || 0),
+            inOut: "out",
+          })),
+          ...openSales.map((s) => ({
+            type: "sale",
+            id: s.id,
+            date: s.issueDate,
+            desc: s.invoiceNo || s.customer,
+            amount: Number(s.total),
+            inOut: "in",
+          })),
+        ].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+        if (items.length === 0) {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `<td colspan="5" class="small" style="color: var(--muted);">No open items. All bank transactions, expenses and invoices are reconciled.</td>`;
+          openRows.appendChild(tr);
+        } else {
+          items.forEach((item) => {
+            const tr = document.createElement("tr");
+            const isIn = item.inOut === "in";
+            const arrow = isIn ? "&#8593;" : "&#8595;";
+            const color = isIn ? "var(--recon-in)" : "var(--recon-out)";
+            const typeLabel = item.type === "bank" ? (isIn ? "Bank (in)" : "Bank (out)") : item.type === "expense" ? "Expense" : "Invoice";
+            tr.innerHTML = `
+              <td><input type="checkbox" class="recon-open-cb" data-item-type="${item.type}" data-item-id="${item.id}" data-amount="${item.amount}" data-in-out="${item.inOut}"></td>
+              <td><span class="small" style="color: ${color}; font-weight: 600;"><span style="font-weight: bold;">${arrow}</span> ${typeLabel}</span></td>
+              <td>${item.date}</td>
+              <td>${(item.desc || "").slice(0, 60)}${(item.desc || "").length > 60 ? "..." : ""}</td>
+              <td style="text-align: right;">${money(item.amount)}</td>
+            `;
+            openRows.appendChild(tr);
+          });
+        }
+        updateReconMatchButton();
+      } else {
+        if (openPanel) openPanel.classList.add("hidden");
+        if (pairedPanel) pairedPanel.classList.remove("hidden");
+        if (!pairedRows) return;
+
+        pairedRows.innerHTML = "";
+        const filteredTx = data.bankTransactions
+          .filter((tx) => tx.reconciled)
+          .sort((a, b) => new Date(b.date) - new Date(a.date));
+
+        if (!filteredTx.length) {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `<td colspan="3" class="small" style="color: var(--muted);">No paired transactions yet.</td>`;
+          pairedRows.appendChild(tr);
+        } else {
+          filteredTx.forEach((tx) => {
+            const tr = document.createElement("tr");
+            let matchInfo = "";
+            let matchDetails = "";
+            let unmatchBtn = "";
+
+            if (tx.reconciliationRefType === 'expenses') {
+              const matchedExpenses = data.expenses.filter((e) => e.bankTransactionId === tx.id);
+              const total = matchedExpenses.reduce((s, e) => s + (Number(e.amount) || 0) + (Number(e.vat) || 0), 0);
+              const adj = Number(tx.adjustmentAmount) || 0;
+              matchInfo = `<span class="status-pill status-paired">Paired</span>`;
+              matchDetails = `
+                <div style="margin-top: 4px;">
+                  <strong>Expenses (${matchedExpenses.length}):</strong> ${matchedExpenses.map((e) => e.vendor).join(", ")}<br>
+                  <span class="small">Combined total: ${money(total)}</span>
+                  ${Math.abs(adj) >= 0.01 ? `<br><span class="small">Adjustment: ${adj >= 0 ? "+" : ""}${money(adj)}</span>` : ""}
+                </div>
+              `;
+              unmatchBtn = `<button type="button" data-action="unmatch" data-tx-id="${tx.id}" class="btn-secondary" style="margin-top:6px;">Unmatch</button>`;
+            } else if (tx.reconciliationRefId) {
+              let matchedItem = null;
+              let matchedType = "";
+              if (tx.reconciliationRefType === 'expense') {
+                matchedItem = data.expenses.find(e => e.id === tx.reconciliationRefId);
+                matchedType = "Expense";
+              } else if (tx.reconciliationRefType === 'sale') {
+                matchedItem = data.sales.find(s => s.id === tx.reconciliationRefId);
+                matchedType = "Invoice";
+              }
+              if (matchedItem) {
+                const ref = matchedType === "Expense" ? matchedItem.vendor : (matchedItem.invoiceNo || matchedItem.customer);
+                const amount = matchedType === "Expense" ? (Number(matchedItem.amount) || 0) + (Number(matchedItem.vat) || 0) : matchedItem.total;
+                const adj = Number(tx.adjustmentAmount) || 0;
+                matchInfo = `<span class="status-pill status-paired">Paired</span>`;
+                matchDetails = `
+                  <div style="margin-top: 4px;">
+                    <strong>${matchedType}:</strong> ${ref}<br>
+                    <span class="small">${matchedType === "Expense" ? "Expense total" : "Invoice total"}: ${money(amount)}</span>
+                    ${Math.abs(adj) >= 0.01 ? `<br><span class="small">Adjustment: ${adj >= 0 ? "+" : ""}${money(adj)}</span>` : ""}
+                  </div>
+                `;
+                unmatchBtn = `<button type="button" data-action="unmatch" data-tx-id="${tx.id}" class="btn-secondary" style="margin-top:6px;">Unmatch</button>`;
+              }
+            }
+
+            const txIsIn = tx.type === "in";
+            const txArrow = txIsIn ? "&#8593;" : "&#8595;";
+            const txColor = txIsIn ? "var(--recon-in)" : "var(--recon-out)";
+            const txLabel = txIsIn ? "Money In" : "Money Out";
+            tr.innerHTML = `
+              <td>
+                <strong style="color: ${txColor};"><span style="font-weight: bold;">${txArrow}</span> ${txLabel}</strong><br>
+                ${tx.date} - ${money(tx.amount)}<br>
+                <span class="small">${tx.description}</span>
+              </td>
+              <td>${matchInfo}${matchDetails}${unmatchBtn}
+                <div class="small" style="margin-top: 4px; color: var(--muted);">Paired on: ${tx.reconciledAt ? new Date(tx.reconciledAt).toLocaleDateString() : "Unknown"}</div>
+              </td>
+              <td><span class="status-pill status-done">Completed</span></td>
+            `;
+            pairedRows.appendChild(tr);
+          });
+        }
+      }
+    }
+
+    function getReconSelection() {
+      const checkboxes = document.querySelectorAll("#reconRows .recon-open-cb:checked");
+      const bankChecked = [];
+      const expenseIds = [];
+      const saleChecked = [];
+      checkboxes.forEach((cb) => {
+        const type = cb.dataset.itemType;
+        const id = cb.dataset.itemId;
+        const amount = Number(cb.dataset.amount) || 0;
+        if (type === "bank") bankChecked.push({ id, amount });
+        else if (type === "expense") expenseIds.push(id);
+        else if (type === "sale") saleChecked.push(id);
+      });
+      const bankTxId = bankChecked.length === 1 ? bankChecked[0].id : null;
+      const bankAmount = bankChecked.length === 1 ? bankChecked[0].amount : null;
+      const saleId = saleChecked.length === 1 ? saleChecked[0] : null;
+      return { bankTxId, expenseIds, saleId, bankAmount, bankCount: bankChecked.length, saleCount: saleChecked.length };
+    }
+
+    function updateReconMatchButton() {
+      const btn = document.getElementById("reconMatchSelected");
+      const status = document.getElementById("reconSelectionStatus");
+      if (!btn || !status) return;
+      const { bankTxId, expenseIds, saleId, bankAmount, bankCount, saleCount } = getReconSelection();
+      const tx = bankTxId ? data.bankTransactions.find((t) => t.id === bankTxId) : null;
+      const isOut = tx && tx.type === "out";
+
+      if (bankCount > 1) {
+        btn.disabled = true;
+        status.textContent = "Select exactly one bank transaction.";
+        return;
+      }
+      if (!bankTxId) {
+        btn.disabled = true;
+        status.textContent = "Select one bank transaction and one or more expenses (Money Out) or one invoice (Money In). Sum must equal the transaction amount.";
+        return;
+      }
+      if (!isOut && saleCount > 1) {
+        btn.disabled = true;
+        status.textContent = "For Money In select only one invoice.";
+        return;
+      }
+      if (isOut) {
+        const expenses = expenseIds.map((id) => data.expenses.find((e) => e.id === id)).filter(Boolean);
+        const sum = expenses.reduce((s, e) => s + (Number(e.amount) || 0) + (Number(e.vat) || 0), 0);
+        const diff = (bankAmount || 0) - sum;
+        const match = expenseIds.length > 0 && Math.abs(diff) <= 0.5;
+        btn.disabled = expenseIds.length === 0 || !match;
+        if (expenseIds.length === 0) {
+          status.textContent = "For Money Out: select one or more expenses. Difference vs bank must be within 0.50 EUR.";
+        } else if (Math.abs(diff) > 0.5) {
+          status.textContent = `Expenses total: ${money(sum)}. Bank: ${money(bankAmount || 0)}. Difference ${money(Math.abs(diff))} exceeds 0.50 EUR.`;
+        } else if (Math.abs(diff) <= 0.01) {
+          status.textContent = `Expenses total: ${money(sum)}. Bank: ${money(bankAmount || 0)}. Match.`;
+        } else {
+          status.textContent = `Expenses total: ${money(sum)}. Bank: ${money(bankAmount || 0)}. Difference: ${money(diff)} EUR will be recorded as adjustment.`;
+        }
+      } else {
+        const sale = saleId ? data.sales.find((s) => s.id === saleId) : null;
+        const saleTotal = sale ? Number(sale.total) : 0;
+        const diff = (bankAmount || 0) - saleTotal;
+        const match = saleId && Math.abs(diff) <= 0.5;
+        btn.disabled = !saleId || !match;
+        if (!saleId) {
+          status.textContent = "For Money In: select one invoice. Difference vs bank must be within 0.50 EUR.";
+        } else if (Math.abs(diff) > 0.5) {
+          status.textContent = `Invoice total: ${money(saleTotal)}. Bank: ${money(bankAmount || 0)}. Difference ${money(Math.abs(diff))} exceeds 0.50 EUR.`;
+        } else if (Math.abs(diff) <= 0.01) {
+          status.textContent = `Invoice total: ${money(saleTotal)}. Bank: ${money(bankAmount || 0)}. Match.`;
+        } else {
+          status.textContent = `Invoice total: ${money(saleTotal)}. Bank: ${money(bankAmount || 0)}. Difference: ${money(diff)} EUR will be recorded as adjustment.`;
+        }
+      }
+    }
+
+    async function performReconMatchSelected() {
+      const { bankTxId, expenseIds, saleId } = getReconSelection();
+      const tx = bankTxId ? data.bankTransactions.find((t) => t.id === bankTxId) : null;
+      if (!tx || !bankTxId) {
+        alert("Select one bank transaction.");
+        return;
+      }
+      if (tx.type === "out") {
+        if (expenseIds.length === 0) {
+          alert("Select at least one expense for this outgoing transaction.");
+          return;
+        }
+        const expenses = expenseIds.map((id) => data.expenses.find((e) => e.id === id)).filter(Boolean);
+        const sum = expenses.reduce((s, e) => s + (Number(e.amount) || 0) + (Number(e.vat) || 0), 0);
+        if (Math.abs((Number(tx.amount) || 0) - sum) > 0.5) {
+          alert("Difference between expenses total and bank transaction must be within 0.50 EUR.");
+          return;
+        }
+        if (expenseIds.length === 1) {
+          await apiPost("/api/reconciliation/match", { bankTransactionId: bankTxId, targetId: expenseIds[0], targetType: "expense" });
+        } else {
+          await apiPost("/api/reconciliation/match-expenses", { bankTransactionId: bankTxId, expenseIds });
+        }
+      } else {
+        if (!saleId) {
+          alert("Select one invoice for this incoming transaction.");
+          return;
+        }
+        const sale = data.sales.find((s) => s.id === saleId);
+        if (sale && Math.abs(Number(sale.total) - Number(tx.amount)) > 0.5) {
+          alert("Difference between invoice total and bank transaction must be within 0.50 EUR.");
+          return;
+        }
+        await apiPost("/api/reconciliation/match", { bankTransactionId: bankTxId, targetId: saleId, targetType: "sale" });
+      }
+      await loadAll();
+      renderReconciliation();
+    }
+
+    function renderCustomers() {
+      const rows = document.getElementById("customerRows");
+      if (!rows) return;
+      rows.innerHTML = "";
+      data.customers
+        .slice()
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .forEach((customer) => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td>${customer.name}</td>
+            <td>${customer.email || "-"}</td>
+            <td>${customer.phone || "-"}</td>
+            <td>${customer.vatNumber || "-"}</td>
+            <td>${(customer.address || "-").replace(/\n/g, "<br>")}</td>
+            <td>
+              <button data-action="edit-customer" data-id="${customer.id}" class="btn-ok">Edit</button>
+              <button data-action="delete-customer" data-id="${customer.id}" class="btn-danger">Delete</button>
+            </td>
+          `;
+          rows.appendChild(tr);
+        });
+    }
+
+    function renderSuppliers() {
+      const rows = document.getElementById("supplierRows");
+      if (!rows) return;
+      rows.innerHTML = "";
+      data.suppliers
+        .slice()
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .forEach((supplier) => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td>${supplier.name}</td>
+            <td>${supplier.categoryName || "-"}</td>
+            <td>${supplier.email || "-"}</td>
+            <td>${supplier.phone || "-"}</td>
+            <td>${supplier.vatNumber || "-"}</td>
+            <td>${(supplier.address || "-").replace(/\n/g, "<br>")}</td>
+            <td><div class="actions" style="margin-top: 0;">
+              <button data-action="edit-supplier" data-id="${supplier.id}" class="btn-ok">Edit</button>
+              <button data-action="delete-supplier" data-id="${supplier.id}" class="btn-danger">Delete</button>
+            </div></td>
+          `;
+          rows.appendChild(tr);
+        });
+    }
+
+    function updateCustomerSelect() {
+      const select = document.getElementById("saleCustomerSelect");
+      if (!select) return;
+      const currentValue = select.value;
+      select.innerHTML = '<option value="">-- Type or select customer --</option>';
+      data.customers
+        .slice()
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .forEach((customer) => {
+          const option = document.createElement("option");
+          option.value = customer.id;
+          option.textContent = customer.name;
+          select.appendChild(option);
+        });
+      select.value = currentValue;
+    }
+
+    function updateSupplierSelect() {
+      const select = document.getElementById("expenseSupplierSelect");
+      if (!select) return;
+      const currentValue = select.value;
+      select.innerHTML = '<option value="">-- Type or select supplier --</option>';
+      data.suppliers
+        .slice()
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .forEach((supplier) => {
+          const option = document.createElement("option");
+          option.value = supplier.id;
+          option.textContent = supplier.name;
+          select.appendChild(option);
+        });
+      select.value = currentValue;
+    }
+
+    function populateCustomerDetails(customerId) {
+      if (!customerId) return;
+      const customer = data.customers.find((c) => c.id === customerId);
+      if (customer) {
+        document.getElementById("saleCustomer").value = customer.name || "";
+        document.getElementById("saleCustomerEmail").value = customer.email || "";
+        document.getElementById("saleCustomerAddress").value = customer.address || "";
+      }
+    }
+
+    function populateSupplierDetails(supplierId) {
+      if (!supplierId) return;
+      const supplier = data.suppliers.find((s) => s.id === supplierId);
+      if (supplier) {
+        document.getElementById("expenseVendor").value = supplier.name || "";
+        if (supplier.categoryId) {
+          const categorySelect = document.getElementById("expenseCategory");
+          if (Array.from(categorySelect.options).some(o => o.value === supplier.categoryId)) {
+            categorySelect.value = supplier.categoryId;
+            onCategoryChange();
+          }
+        }
+      }
+    }
+
+    function updateExpenseCategorySelect() {
+      const select = document.getElementById("expenseCategory");
+      if (!select) return;
+      const currentValue = select.value;
+      // Keep the first option, remove others
+      while (select.options.length > 1) {
+        select.remove(1);
+      }
+      data.expenseCategories
+        .filter(c => c.active !== false)
+        .slice()
+        .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name))
+        .forEach((category) => {
+          const option = document.createElement("option");
+          option.value = category.id;
+          option.textContent = category.name + (category.defaultVatRate ? ` (${category.defaultVatRate}%)` : "");
+          option.dataset.vatRate = category.defaultVatRate || "21";
+          select.appendChild(option);
+        });
+      // Restore selected value if still valid
+      if (currentValue && Array.from(select.options).some(o => o.value === currentValue)) {
+        select.value = currentValue;
+      }
+    }
+
+    function updateSupplierCategorySelects() {
+      if (!data.expenseCategories || !Array.isArray(data.expenseCategories)) return;
+      const options = data.expenseCategories
+        .filter(c => c.active !== false)
+        .slice()
+        .sort((a, b) => (a.sortOrder != null ? a.sortOrder : 0) - (b.sortOrder != null ? b.sortOrder : 0) || (a.name || "").localeCompare(b.name || ""));
+      [document.getElementById("supplierCategory"), document.getElementById("supplierEditCategory")].forEach((select) => {
+        if (!select) return;
+        const currentValue = select.value;
+        while (select.options.length > 1) select.remove(1);
+        options.forEach((category) => {
+          const option = document.createElement("option");
+          option.value = category.id;
+          option.textContent = category.name || "";
+          select.appendChild(option);
+        });
+        if (currentValue && Array.from(select.options).some(o => o.value === currentValue)) {
+          select.value = currentValue;
+        }
+      });
+    }
+
+    function calculateExpenseVat() {
+      const amountInput = document.getElementById("expenseAmount");
+      const vatRateSelect = document.getElementById("expenseVatRate");
+      const vatAmountInput = document.getElementById("expenseVat");
+
+      const amount = Number(amountInput.value) || 0;
+      const vatRate = Number(vatRateSelect.value) || 0;
+      const vatAmount = Math.round(amount * (vatRate / 100) * 100) / 100;
+
+      vatAmountInput.value = vatAmount.toFixed(2);
+    }
+
+    // Update VAT rate when category changes
+    function onCategoryChange() {
+      const categorySelect = document.getElementById("expenseCategory");
+      const vatRateSelect = document.getElementById("expenseVatRate");
+
+      const selectedOption = categorySelect.options[categorySelect.selectedIndex];
+      if (selectedOption && selectedOption.dataset.vatRate) {
+        vatRateSelect.value = selectedOption.dataset.vatRate;
+      }
+      calculateExpenseVat();
+    }
+
+    function renderAll() {
+      renderExpenses();
+      renderSales();
+      renderBank();
+      renderReconciliation();
+      renderCustomers();
+      renderSuppliers();
+      updateCustomerSelect();
+      updateSupplierSelect();
+      updateExpenseCategorySelect();
+    }
+
+    const ACTIVE_TAB_KEY = 'el_contador_active_tab';
+
+    function switchTab(tabName) {
+      document.querySelectorAll(".tab-btn").forEach((btn) => {
+        btn.classList.toggle("active", btn.dataset.tab === tabName);
+      });
+      document.querySelectorAll(".tab-content").forEach((tab) => {
+        tab.classList.add("hidden");
+      });
+      document.getElementById("tab-" + tabName).classList.remove("hidden");
+      if (tabName === "dashboard") loadDashboard();
+      if (tabName === "settings") loadInvoiceConfig();
+      if (tabName === "suppliers") updateSupplierCategorySelects();
+      // Save active tab to localStorage
+      localStorage.setItem(ACTIVE_TAB_KEY, tabName);
+    }
+
+    async function loadDashboard() {
+      try {
+        const summary = await apiGet("/api/dashboard/summary?groupBy=" + encodeURIComponent(dashboardPeriod));
+        document.getElementById("dashboardIncome").textContent = money(summary.totalIncome) + " EUR";
+        document.getElementById("dashboardExpenses").textContent = money(summary.totalExpenses) + " EUR";
+        const balEl = document.getElementById("dashboardBalance");
+        balEl.textContent = money(summary.balance) + " EUR";
+        balEl.style.color = summary.balance >= 0 ? "var(--ok)" : "var(--danger)";
+        document.getElementById("dashboardCashflowIncoming").textContent = money(summary.cashflowIncoming ?? 0) + " EUR";
+        document.getElementById("dashboardCashflowOutgoing").textContent = money(summary.cashflowOutgoing ?? 0) + " EUR";
+        const cashflowEl = document.getElementById("dashboardCashflow");
+        cashflowEl.textContent = money(summary.cashflow ?? 0) + " EUR";
+        cashflowEl.style.color = (summary.cashflow ?? 0) >= 0 ? "var(--ok)" : "var(--danger)";
+        const bankBalEl = document.getElementById("dashboardBankBalance");
+        bankBalEl.textContent = money(summary.bankBalance ?? 0) + " EUR";
+        bankBalEl.style.color = (summary.bankBalance ?? 0) >= 0 ? "var(--ok)" : "var(--danger)";
+        renderDashboardChart(summary.periods);
+      } catch (e) {
+        console.warn("Dashboard load failed", e);
+        document.getElementById("dashboardIncome").textContent = "0.00 EUR";
+        document.getElementById("dashboardExpenses").textContent = "0.00 EUR";
+        document.getElementById("dashboardBalance").textContent = "0.00 EUR";
+        document.getElementById("dashboardCashflowIncoming").textContent = "0.00 EUR";
+        document.getElementById("dashboardCashflowOutgoing").textContent = "0.00 EUR";
+        document.getElementById("dashboardCashflow").textContent = "0.00 EUR";
+        document.getElementById("dashboardBankBalance").textContent = "0.00 EUR";
+        if (dashboardChartInstance) dashboardChartInstance.destroy();
+        dashboardChartInstance = null;
+      }
+
+      // Load expense category breakdown for dashboard
+      try {
+        const currentYear = new Date().getFullYear();
+        const expenseSummary = await apiGet(`/api/reports/vat/expense-summary?year=${currentYear}`);
+
+        // Render expense category chart
+        const ctx = document.getElementById("expenseCategoryChart");
+        if (ctx && window.Chart) {
+          if (expenseCategoryChartInstance) expenseCategoryChartInstance.destroy();
+
+          const categories = expenseSummary.categories.slice(0, 8);
+          expenseCategoryChartInstance = new Chart(ctx, {
+            type: 'pie',
+            data: {
+              labels: categories.map(c => c.category),
+              datasets: [{
+                data: categories.map(c => c.totalAmount),
+                backgroundColor: [
+                  '#2d66d7', '#159767', '#cb3340', '#f5a623', '#9013fe',
+                  '#7ed321', '#50e3c2', '#b8e986'
+                ],
+                borderWidth: 2,
+                borderColor: '#fff',
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: {
+                legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } },
+                tooltip: {
+                  callbacks: {
+                    label: function(context) {
+                      const value = context.raw;
+                      const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                      const pct = ((value / total) * 100).toFixed(1);
+                      return `${context.label}: ${money(value)} (${pct}%)`;
+                    }
+                  }
+                }
+              }
+            }
+          });
+        }
+
+        // Update category table
+        const tableBody = document.getElementById("dashboardExpenseCategories");
+        tableBody.innerHTML = "";
+        expenseSummary.categories.slice(0, 10).forEach(cat => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td>${cat.category}</td>
+            <td style="text-align: right;">${money(cat.totalAmount)}</td>
+            <td style="text-align: right; color: var(--muted);">${money(cat.vatAmount)}</td>
+          `;
+          tableBody.appendChild(tr);
+        });
+      } catch (e) {
+        console.warn("Expense summary load failed", e);
+      }
+
+      // Load current quarter VAT summary: charged (sales), claimable (expenses), net pay/receive
+      try {
+        const now = new Date();
+        const currentQuarter = Math.floor((now.getMonth() + 3) / 3);
+        const vatSummary = await apiGet(`/api/reports/vat/quarterly?year=${now.getFullYear()}&quarter=${currentQuarter}`);
+
+        const vatCharged = vatSummary.sales?.vatAmount ?? 0;
+        const vatClaimable = vatSummary.expenses?.vatAmount ?? 0;
+        const netPosition = vatSummary.vatPosition?.netPosition ?? 0;
+        const status = vatSummary.vatPosition?.status ?? 'balanced';
+
+        document.getElementById("dashboardVatCharged").textContent = money(vatCharged) + " EUR";
+        document.getElementById("dashboardVatClaimable").textContent = money(vatClaimable) + " EUR";
+        const netEl = document.getElementById("dashboardVatNet");
+        netEl.textContent = money(Math.abs(netPosition)) + " EUR";
+        netEl.style.color = status === 'to_pay' ? 'var(--danger)' : status === 'to_receive' ? 'var(--ok)' : 'var(--text)';
+        const statusEl = document.getElementById("dashboardVatStatus");
+        if (status === 'to_pay') statusEl.textContent = "You will pay this to the tax authority";
+        else if (status === 'to_receive') statusEl.textContent = "You will receive this from the tax authority";
+        else statusEl.textContent = "Balanced (no payment due)";
+      } catch (e) {
+        console.warn("VAT summary load failed", e);
+      }
+    }
+
+    function renderDashboardChart(periods) {
+      const ctx = document.getElementById("dashboardChart");
+      if (!ctx || !window.Chart) return;
+      const labels = (periods || []).map((p) => p.label);
+      const incomeData = (periods || []).map((p) => p.income);
+      const expensesData = (periods || []).map((p) => p.expenses);
+      if (dashboardChartInstance) dashboardChartInstance.destroy();
+      dashboardChartInstance = new Chart(ctx, {
+        type: "line",
+        data: {
+          labels,
+          datasets: [
+            { label: "Income", data: incomeData, borderColor: "rgb(21, 151, 103)", backgroundColor: "rgba(21, 151, 103, 0.1)", fill: true, tension: 0.2 },
+            { label: "Expenses", data: expensesData, borderColor: "rgb(203, 51, 64)", backgroundColor: "rgba(203, 51, 64, 0.1)", fill: true, tension: 0.2 },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            y: { beginAtZero: true, ticks: { callback: (v) => v + " EUR" } },
+          },
+        },
+      });
+    }
+
+    async function loadAll() {
+      const [expenses, sales, bankTransactions, customers, suppliers, expenseCategories] = await Promise.all([
+        apiGet("/api/expenses" + (expenseSearchTerm ? "?search=" + encodeURIComponent(expenseSearchTerm) : "")),
+        apiGet("/api/sales"),
+        apiGet("/api/bank-transactions"),
+        apiGet("/api/customers"),
+        apiGet("/api/suppliers"),
+        apiGet("/api/expense-categories"),
+      ]);
+      data.expenses = expenses;
+      data.sales = sales;
+      data.bankTransactions = bankTransactions;
+      data.customers = customers;
+      data.suppliers = suppliers;
+      data.expenseCategories = expenseCategories;
+      renderAll();
+    }
+
+    async function loadExpenses(searchTerm) {
+      const url = searchTerm ? "/api/expenses?search=" + encodeURIComponent(searchTerm) : "/api/expenses";
+      data.expenses = await apiGet(url);
+      renderExpenses();
+    }
+
+    function clearExpenseDuplicateWarning() {
+      const el = document.getElementById("expenseDuplicateWarning");
+      if (el) { el.textContent = ""; el.style.color = ""; }
+    }
+
+    let expenseDuplicateCheckTimeout = null;
+    async function checkExpenseDuplicate() {
+      const invEl = document.getElementById("expenseInvoiceNumber");
+      const supEl = document.getElementById("expenseSupplierSelect");
+      const warnEl = document.getElementById("expenseDuplicateWarning");
+      const editId = document.getElementById("expenseEditId").value.trim();
+      const invoiceNumber = (invEl && invEl.value || "").trim();
+      const supplierId = supEl ? supEl.value : "";
+      if (!invoiceNumber) {
+        clearExpenseDuplicateWarning();
+        return;
+      }
+      const params = new URLSearchParams({ invoiceNumber });
+      if (supplierId) params.set("supplierId", supplierId);
+      if (editId) params.set("excludeId", editId);
+      try {
+        const r = await fetch("/api/expenses/check-duplicate?" + params.toString(), { credentials: "same-origin" });
+        if (r.status === 401) { window.location.href = "/login"; return; }
+        const data = await r.json().catch(() => ({}));
+        if (!warnEl) return;
+        if (data.sameSupplierDuplicate) {
+          warnEl.textContent = "An expense with this invoice number already exists for this supplier. You cannot save.";
+          warnEl.style.color = "var(--danger)";
+        } else if (data.otherSupplierDuplicate) {
+          warnEl.textContent = "Risk of duplicate receipt: an expense with this invoice number already exists. You can still save if this is a different receipt.";
+          warnEl.style.color = "var(--muted)";
+        } else {
+          warnEl.textContent = "";
+          warnEl.style.color = "";
+        }
+      } catch (_) {
+        if (warnEl) { warnEl.textContent = ""; warnEl.style.color = ""; }
+      }
+    }
+
+    function scheduleExpenseDuplicateCheck() {
+      clearTimeout(expenseDuplicateCheckTimeout);
+      expenseDuplicateCheckTimeout = setTimeout(checkExpenseDuplicate, 350);
+    }
+
+    function clearExpenseEditMode() {
+      document.getElementById("expenseEditId").value = "";
+      document.getElementById("expenseForm").reset();
+      updateSupplierSelect();
+      updateExpenseCategorySelect();
+      calculateExpenseVat();
+      document.getElementById("expenseSubmitBtn").textContent = "Save Expense";
+      document.getElementById("expenseFormEditCancel").style.display = "none";
+      onExpenseFileChange();
+      clearExpenseDuplicateWarning();
+    }
+
+    function openExpenseInForm(expense) {
+      document.getElementById("expenseEditId").value = expense.id;
+      document.getElementById("expenseDate").value = (expense.date || "").toString().slice(0, 10);
+      document.getElementById("expenseVendor").value = expense.vendor || "";
+      document.getElementById("expenseSupplierSelect").value = expense.supplierId || "";
+      document.getElementById("expenseCategory").value = expense.categoryId || "";
+      document.getElementById("expenseAmount").value = expense.amount ?? "";
+      document.getElementById("expenseVat").value = expense.vat ?? 0;
+      document.getElementById("expenseVatRate").value = expense.vatRate ?? 21;
+      document.getElementById("expenseInvoiceNumber").value = expense.invoiceNumber || expense.invoice_number || "";
+      document.getElementById("expenseNotes").value = expense.notes || "";
+      document.getElementById("expenseSubmitBtn").textContent = "Save";
+      document.getElementById("expenseFormEditCancel").style.display = "inline-block";
+      document.getElementById("expenseForm").scrollIntoView({ behavior: "smooth", block: "start" });
+      scheduleExpenseDuplicateCheck();
+    }
+
+    async function onExpenseSubmit(event) {
+      event.preventDefault();
+      const form = document.getElementById("expenseForm");
+      const supplierId = document.getElementById("expenseSupplierSelect").value;
+      const categoryId = document.getElementById("expenseCategory").value;
+      const vatRate = document.getElementById("expenseVatRate").value;
+      const editId = document.getElementById("expenseEditId").value.trim();
+
+      if (editId) {
+        try {
+          const updated = await apiPut("/api/expenses/" + editId, {
+            date: document.getElementById("expenseDate").value,
+            vendor: document.getElementById("expenseVendor").value.trim(),
+            amount: document.getElementById("expenseAmount").value,
+            vat: document.getElementById("expenseVat").value || "0",
+            vatRate,
+            notes: document.getElementById("expenseNotes").value.trim(),
+            invoiceNumber: document.getElementById("expenseInvoiceNumber").value.trim() || null,
+            supplierId: supplierId || null,
+            categoryId: categoryId || null,
+          });
+          const idx = data.expenses.findIndex((e) => e.id === editId);
+          if (idx >= 0) data.expenses[idx] = updated;
+          clearExpenseEditMode();
+          await loadExpenses(expenseSearchTerm);
+          renderAll();
+        } catch (e) {
+          let msg = e.message || "Failed to update expense.";
+          try {
+            const j = JSON.parse(e.message);
+            if (j.error) msg = j.error;
+          } catch (_) {}
+          alert(msg);
+        }
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append("date", document.getElementById("expenseDate").value);
+      formData.append("vendor", document.getElementById("expenseVendor").value.trim());
+      formData.append("amount", document.getElementById("expenseAmount").value);
+      formData.append("vat", document.getElementById("expenseVat").value || "0");
+      formData.append("vatRate", vatRate);
+      formData.append("notes", document.getElementById("expenseNotes").value.trim());
+      const invoiceNumber = document.getElementById("expenseInvoiceNumber").value.trim();
+      if (invoiceNumber) formData.append("invoiceNumber", invoiceNumber);
+      if (supplierId) formData.append("supplierId", supplierId);
+      if (categoryId) formData.append("categoryId", categoryId);
+      const file = document.getElementById("expenseFile").files[0];
+      if (file) formData.append("file", file);
+
+      const r = await fetch("/api/expenses", {
+        method: "POST",
+        body: formData,
+        credentials: "same-origin",
+      });
+      if (r.status === 401) {
+        window.location.href = "/login";
+        return;
+      }
+      const body = await r.json().catch(() => ({}));
+      if (r.status === 409 && body.code === "DUPLICATE_INVOICE_SAME_SUPPLIER") {
+        alert(body.message || "An expense with this invoice number already exists for this supplier.");
+        return;
+      }
+      if (!r.ok) {
+        alert(body.message || body.error || "Failed to save expense.");
+        return;
+      }
+      const created = body;
+      if (created.warning && created.warning.message) {
+        alert(created.warning.message);
+      }
+      clearExpenseEditMode();
+      await loadExpenses(expenseSearchTerm);
+      renderAll();
+    }
+
+    // Show/hide Preview and Extract buttons based on file selection
+    function onExpenseFileChange() {
+      const file = document.getElementById("expenseFile").files[0];
+      const btnPreview = document.getElementById("btnPreviewExpenseFile");
+      const btnExtract = document.getElementById("btnExtractInvoice");
+      const status = document.getElementById("extractionStatus");
+      
+      if (file) {
+        if (btnPreview) btnPreview.style.display = "inline-block";
+        btnExtract.style.display = "inline-block";
+        status.textContent = "Preview the file or click 'Extract Data' to auto-fill form fields.";
+      } else {
+        if (btnPreview) btnPreview.style.display = "none";
+        btnExtract.style.display = "none";
+        status.textContent = "";
+      }
+    }
+
+    // Extract invoice data using Gemini AI
+    async function onExtractInvoice() {
+      const file = document.getElementById("expenseFile").files[0];
+      if (!file) {
+        alert("Please select a file first");
+        return;
+      }
+
+      const btnExtract = document.getElementById("btnExtractInvoice");
+      const status = document.getElementById("extractionStatus");
+      
+      btnExtract.disabled = true;
+      btnExtract.textContent = "Extracting...";
+      status.textContent = "Analyzing invoice with AI...";
+      status.style.color = "var(--accent)";
+
+      try {
+        const formData = new FormData();
+        formData.append("file", file);
+        
+        const result = await apiPostForm("/api/expenses/extract", formData);
+        
+        if (result.success && result.data) {
+          // Fill form fields with extracted data
+          await fillExpenseFormWithExtractedData(result.data);
+          status.textContent = "Data extracted successfully! Please review before saving.";
+          status.style.color = "var(--ok)";
+        } else {
+          status.textContent = "Could not extract data. Please fill in manually.";
+          status.style.color = "var(--danger)";
+        }
+      } catch (error) {
+        console.error("Extraction failed:", error);
+        status.textContent = "Extraction failed: " + (error.message || "Unknown error");
+        status.style.color = "var(--danger)";
+      } finally {
+        btnExtract.disabled = false;
+        btnExtract.textContent = "Extract Data";
+      }
+    }
+
+    // Calculate string similarity score (0-1) using Levenshtein distance
+    function stringSimilarity(str1, str2) {
+      const s1 = str1.toLowerCase().trim();
+      const s2 = str2.toLowerCase().trim();
+      
+      // Exact match
+      if (s1 === s2) return 1.0;
+      
+      // One contains the other - high similarity
+      if (s1.includes(s2) || s2.includes(s1)) {
+        const longer = s1.length > s2.length ? s1 : s2;
+        const shorter = s1.length > s2.length ? s2 : s1;
+        // Score based on how much of the longer string is covered
+        return 0.7 + (shorter.length / longer.length) * 0.3;
+      }
+      
+      // Calculate Levenshtein distance
+      const len1 = s1.length;
+      const len2 = s2.length;
+      const matrix = Array(len2 + 1).fill(null).map(() => Array(len1 + 1).fill(null));
+      
+      for (let i = 0; i <= len1; i++) matrix[0][i] = i;
+      for (let j = 0; j <= len2; j++) matrix[j][0] = j;
+      
+      for (let j = 1; j <= len2; j++) {
+        for (let i = 1; i <= len1; i++) {
+          const cost = s1[i - 1] === s2[j - 1] ? 0 : 1;
+          matrix[j][i] = Math.min(
+            matrix[j][i - 1] + 1,
+            matrix[j - 1][i] + 1,
+            matrix[j - 1][i - 1] + cost
+          );
+        }
+      }
+      
+      const distance = matrix[len2][len1];
+      const maxLen = Math.max(len1, len2);
+      return 1 - (distance / maxLen);
+    }
+    
+    // Extract base supplier name by removing common location/branch suffixes
+    function extractBaseSupplierName(name) {
+      const locationPatterns = [
+        /\s+(?:station|amsterdam|rotterdam|den\s*haag|utrecht|eindhoven|groningen|tilburg|almere|breda|nijmegen|arnhem|zaandam|haarlem|leiden|delft|schiphol|centraal|centrum|airport|west|oost|noord|zuid|north|south|east|zuid|city|plaza|mall|drive|shop|store|markt|straat|weg|laan|plein|singel|gracht)\s*.*$/i,
+        /^\s*|\s*$/g
+      ];
+      
+      let baseName = name;
+      for (const pattern of locationPatterns) {
+        baseName = baseName.replace(pattern, '');
+      }
+      return baseName.trim();
+    }
+    
+    // Find best matching supplier using fuzzy matching
+    function findBestMatchingSupplier(vendorName) {
+      const SIMILARITY_THRESHOLD = 0.6;
+      let bestMatch = null;
+      let bestScore = 0;
+      
+      const vendorBase = extractBaseSupplierName(vendorName);
+      
+      for (const supplier of data.suppliers) {
+        const supplierBase = extractBaseSupplierName(supplier.name);
+        
+        // Calculate similarity with full names
+        const fullSimilarity = stringSimilarity(vendorName, supplier.name);
+        
+        // Calculate similarity with base names (without location)
+        const baseSimilarity = stringSimilarity(vendorBase, supplierBase);
+        
+        // Use the higher of the two scores
+        const score = Math.max(fullSimilarity, baseSimilarity);
+        
+        if (score > bestScore && score >= SIMILARITY_THRESHOLD) {
+          bestScore = score;
+          bestMatch = supplier;
+        }
+      }
+      
+      return { supplier: bestMatch, score: bestScore };
+    }
+
+    // Fill expense form with extracted invoice data
+    async function fillExpenseFormWithExtractedData(extractedData) {
+      // Set date
+      if (extractedData.date) {
+        document.getElementById("expenseDate").value = extractedData.date;
+      }
+      
+      // Set invoice / receipt number
+      if (extractedData.invoiceNumber) {
+        document.getElementById("expenseInvoiceNumber").value = extractedData.invoiceNumber;
+      }
+      
+      // Set vendor and handle supplier matching/creation
+      if (extractedData.vendor) {
+        const vendorInput = document.getElementById("expenseVendor");
+        vendorInput.value = extractedData.vendor;
+        
+        // Find best matching supplier using fuzzy matching
+        const { supplier, score } = findBestMatchingSupplier(extractedData.vendor);
+        
+        if (supplier) {
+          document.getElementById("expenseSupplierSelect").value = supplier.id;
+          populateSupplierDetails(supplier.id);
+          console.log(`Matched supplier "${extractedData.vendor}" to "${supplier.name}" (similarity: ${score.toFixed(2)})`);
+        } else {
+          // Create new supplier if no good match found
+          try {
+            const newSupplier = await apiPost("/api/suppliers", {
+              name: extractedData.vendor,
+              email: extractedData.vendorEmail || null,
+              address: extractedData.vendorAddress || null,
+              vatNumber: extractedData.vendorVatNumber || null
+            });
+            
+            // Add to local data and refresh select
+            data.suppliers.push(newSupplier);
+            data.suppliers.sort((a, b) => a.name.localeCompare(b.name));
+            updateSupplierSelect();
+            
+            // Select the new supplier
+            document.getElementById("expenseSupplierSelect").value = newSupplier.id;
+          } catch (err) {
+            console.error("Failed to create supplier:", err);
+            // Continue without supplier - user can assign manually
+          }
+        }
+      }
+      
+      // Set amounts
+      if (extractedData.netAmount) {
+        document.getElementById("expenseAmount").value = extractedData.netAmount.toFixed(2);
+      }
+      
+      if (extractedData.vatAmount) {
+        document.getElementById("expenseVat").value = extractedData.vatAmount.toFixed(2);
+      }
+      
+      // Set VAT rate
+      if (extractedData.vatRate !== null && extractedData.vatRate !== undefined) {
+        const vatRateSelect = document.getElementById("expenseVatRate");
+        const rate = Math.round(extractedData.vatRate);
+        // Find closest matching option
+        const options = Array.from(vatRateSelect.options);
+        const matchingOption = options.find(o => Math.round(parseFloat(o.value)) === rate);
+        if (matchingOption) {
+          vatRateSelect.value = matchingOption.value;
+        }
+      }
+      
+      // Set notes (description and currency only; invoice number has its own field)
+      const notesParts = [];
+      if (extractedData.description) {
+        notesParts.push(extractedData.description);
+      }
+      if (extractedData.currency && extractedData.currency !== 'EUR') {
+        notesParts.push(`Currency: ${extractedData.currency}`);
+      }
+      
+      if (notesParts.length > 0) {
+        document.getElementById("expenseNotes").value = notesParts.join("\n");
+      }
+      
+      // Recalculate VAT display
+      calculateExpenseVat();
+    }
+
+    function lineVat(amount, rate) {
+      return Math.round(amount * (Number(rate) / 100) * 100) / 100;
+    }
+
+    function addSaleLine() {
+      const container = document.getElementById("saleLinesContainer");
+      const lineCount = container.querySelectorAll(".sale-line").length;
+      const div = document.createElement("div");
+      div.className = "sale-line";
+      div.style.cssText = "display: grid; grid-template-columns: 1fr 100px 90px auto; gap: 8px; align-items: start; margin-bottom: 8px;";
+      div.innerHTML = `
+        <textarea class="sale-line-desc" rows="2" placeholder="Description"></textarea>
+        <input type="number" class="sale-line-amount" step="0.01" min="0" placeholder="Amount">
+        <select class="sale-line-vat">
+          <option value="0">0%</option>
+          <option value="9">9%</option>
+          <option value="21" selected>21%</option>
+        </select>
+        <button type="button" class="sale-line-remove btn-ok" style="padding: 6px 10px;">Remove</button>
+      `;
+      container.appendChild(div);
+      div.querySelector(".sale-line-remove").addEventListener("click", function () {
+        if (container.querySelectorAll(".sale-line").length <= 1) return;
+        div.remove();
+        updateSaleTotalsFromLines();
+      });
+      ["input", "change"].forEach((ev) => {
+        div.querySelector(".sale-line-amount").addEventListener(ev, updateSaleTotalsFromLines);
+        div.querySelector(".sale-line-vat").addEventListener(ev, updateSaleTotalsFromLines);
+      });
+      updateSaleTotalsFromLines();
+    }
+
+    function updateSaleTotalsFromLines() {
+      let net = 0, vatSum = 0;
+      document.querySelectorAll("#saleLinesContainer .sale-line").forEach((row) => {
+        const amount = Number(row.querySelector(".sale-line-amount").value) || 0;
+        const rate = Number(row.querySelector(".sale-line-vat").value) || 0;
+        net += amount;
+        vatSum += lineVat(amount, rate);
+      });
+      const total = Math.round((net + vatSum) * 100) / 100;
+      net = Math.round(net * 100) / 100;
+      vatSum = Math.round(vatSum * 100) / 100;
+      document.getElementById("saleNetDisplay").textContent = net.toFixed(2);
+      document.getElementById("saleVatDisplay").textContent = vatSum.toFixed(2);
+      document.getElementById("saleTotalDisplay").textContent = total.toFixed(2);
+    }
+
+    async function onSaleSubmit(event) {
+      event.preventDefault();
+      const lines = [];
+      document.querySelectorAll("#saleLinesContainer .sale-line").forEach((row) => {
+        const desc = row.querySelector(".sale-line-desc").value.trim();
+        const amount = Number(row.querySelector(".sale-line-amount").value) || 0;
+        const vatRate = Number(row.querySelector(".sale-line-vat").value) || 0;
+        if (!desc && amount === 0) return;
+        lines.push({ description: desc || "-", amount, vatRate });
+      });
+      if (lines.length === 0) {
+        alert("Add at least one line with description and amount.");
+        return;
+      }
+      const customerId = document.getElementById("saleCustomerSelect").value || null;
+      const editId = document.getElementById("saleEditId").value.trim();
+
+      if (editId) {
+        try {
+          const updated = await apiPut("/api/sales/" + editId, {
+            invoiceNo: document.getElementById("saleInvoiceNo").value.trim(),
+            customer: document.getElementById("saleCustomer").value.trim(),
+            customerEmail: document.getElementById("saleCustomerEmail").value.trim(),
+            customerAddress: document.getElementById("saleCustomerAddress").value.trim(),
+            customerId: customerId || null,
+            issueDate: document.getElementById("saleIssueDate").value,
+            dueDate: document.getElementById("saleDueDate").value,
+            lines,
+          });
+          const idx = data.sales.findIndex((s) => s.id === editId);
+          if (idx >= 0) data.sales[idx] = updated;
+          clearSaleEditMode();
+          renderAll();
+        } catch (e) {
+          let msg = e.message || "Failed to update invoice.";
+          try {
+            const j = JSON.parse(e.message);
+            if (j.error) msg = j.error;
+          } catch (_) {}
+          alert(msg);
+        }
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append("invoiceNo", document.getElementById("saleInvoiceNo").value.trim());
+      formData.append("customer", document.getElementById("saleCustomer").value.trim());
+      formData.append("customerEmail", document.getElementById("saleCustomerEmail").value.trim());
+      formData.append("customerAddress", document.getElementById("saleCustomerAddress").value.trim());
+      if (customerId) formData.append("customerId", customerId);
+      formData.append("issueDate", document.getElementById("saleIssueDate").value);
+      formData.append("dueDate", document.getElementById("saleDueDate").value);
+      formData.append("lines", JSON.stringify(lines));
+
+      const file = document.getElementById("saleFile").files[0];
+      if (file) formData.append("file", file);
+
+      try {
+        const created = await apiPostForm("/api/sales", formData);
+        data.sales.push(created);
+      } catch (e) {
+        let msg = e.message || "Failed to save invoice.";
+        try {
+          const j = JSON.parse(e.message);
+          if (j.error) msg = j.error;
+        } catch (_) {}
+        alert(msg);
+        return;
+      }
+      clearSaleEditMode();
+      renderAll();
+    }
+
+    function clearSaleEditMode() {
+      document.getElementById("saleEditId").value = "";
+      document.getElementById("saleInvoiceNo").value = "";
+      document.getElementById("saleCustomerSelect").value = "";
+      document.getElementById("saleCustomer").value = "";
+      document.getElementById("saleCustomerEmail").value = "";
+      document.getElementById("saleCustomerAddress").value = "";
+      document.getElementById("saleIssueDate").value = "";
+      document.getElementById("saleDueDate").value = "";
+      document.getElementById("saleLinesContainer").innerHTML = "";
+      document.getElementById("saleFile").value = "";
+      addSaleLine();
+      updateSaleTotalsFromLines();
+      document.getElementById("saleSubmitBtn").textContent = "Save Invoice";
+      document.getElementById("saleFormEditCancel").style.display = "none";
+    }
+
+    function openSaleEditModal(sale) {
+      openSaleInForm(sale);
+    }
+
+    function openSaleInForm(sale) {
+      document.getElementById("saleEditId").value = sale.id;
+      document.getElementById("saleInvoiceNo").value = sale.invoiceNo || "";
+      document.getElementById("saleCustomer").value = sale.customer || "";
+      document.getElementById("saleCustomerEmail").value = sale.customerEmail || "";
+      document.getElementById("saleCustomerAddress").value = sale.customerAddress || "";
+      if (sale.customerId) document.getElementById("saleCustomerSelect").value = sale.customerId;
+      else document.getElementById("saleCustomerSelect").value = "";
+      document.getElementById("saleIssueDate").value = (sale.issueDate || "").toString().slice(0, 10);
+      document.getElementById("saleDueDate").value = (sale.dueDate || "").toString().slice(0, 10);
+      const container = document.getElementById("saleLinesContainer");
+      container.innerHTML = "";
+      const lineList = Array.isArray(sale.lines) && sale.lines.length > 0 ? sale.lines : [{ description: "", amount: 0, vatRate: 21 }];
+      for (let i = 0; i < lineList.length; i++) addSaleLine();
+      container.querySelectorAll(".sale-line").forEach((row, i) => {
+        const line = lineList[i];
+        if (line) {
+          row.querySelector(".sale-line-desc").value = line.description || "";
+          row.querySelector(".sale-line-amount").value = line.amount ?? "";
+          row.querySelector(".sale-line-vat").value = line.vatRate ?? 21;
+        }
+      });
+      updateSaleTotalsFromLines();
+      document.getElementById("saleSubmitBtn").textContent = "Save";
+      document.getElementById("saleFormEditCancel").style.display = "inline-block";
+      document.getElementById("saleForm").scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    async function onSaleEditSubmit(event) {
+      event.preventDefault();
+      const id = document.getElementById("saleEditModalId").value;
+      const errEl = document.getElementById("saleEditError");
+      errEl.style.display = "none";
+      errEl.textContent = "";
+      try {
+        const updated = await apiPut("/api/sales/" + id, {
+          invoiceNo: document.getElementById("saleEditInvoiceNo").value.trim(),
+          customer: document.getElementById("saleEditCustomer").value.trim(),
+          customerEmail: document.getElementById("saleEditCustomerEmail").value.trim(),
+          customerAddress: document.getElementById("saleEditCustomerAddress").value.trim(),
+          issueDate: document.getElementById("saleEditIssueDate").value,
+          dueDate: document.getElementById("saleEditDueDate").value,
+        });
+        const idx = data.sales.findIndex((s) => s.id === id);
+        if (idx >= 0) data.sales[idx] = updated;
+        document.getElementById("saleEditModal").classList.add("hidden");
+        renderAll();
+      } catch (e) {
+        let msg = e.message || "Failed to update.";
+        try {
+          const j = JSON.parse(e.message);
+          if (j.error) msg = j.error;
+        } catch (_) {}
+        errEl.textContent = msg;
+        errEl.style.display = "block";
+      }
+    }
+
+    async function voidSale(saleId) {
+      if (!confirm("Void this invoice? It will be marked as voided and cannot be edited.")) return;
+      try {
+        const updated = await apiPut("/api/sales/" + saleId, { voided: true });
+        const idx = data.sales.findIndex((s) => s.id === saleId);
+        if (idx >= 0) data.sales[idx] = updated;
+        renderAll();
+      } catch (e) {
+        alert(e.message || "Failed to void invoice.");
+      }
+    }
+
+    async function onBankSubmit(event) {
+      event.preventDefault();
+      const created = await apiPost("/api/bank-transactions", {
+        date: document.getElementById("bankDate").value,
+        type: document.getElementById("bankType").value,
+        amount: Number(document.getElementById("bankAmount").value),
+        reference: document.getElementById("bankReference").value.trim(),
+        description: document.getElementById("bankDescription").value.trim(),
+      });
+      data.bankTransactions.push(created);
+      event.target.reset();
+      renderAll();
+    }
+
+    async function loadInvoiceConfig() {
+      try {
+        const c = await apiGet("/api/invoice-config");
+        invoiceConfig = c;
+        document.getElementById("cfgCompanyName").value = c.companyName || "";
+        document.getElementById("cfgTagline").value = c.tagline || "";
+        document.getElementById("cfgEmail").value = c.email || "";
+        document.getElementById("cfgVatNumber").value = c.vatNumber || "";
+        document.getElementById("cfgCompanyNumber").value = c.companyNumber || "";
+        document.getElementById("cfgAddress").value = c.address || "";
+        document.getElementById("cfgFooter").value = c.footer != null ? c.footer : (c.footerLine1 ? c.footerLine1 + (c.footerLine2 ? "\n" + c.footerLine2 : "") : "");
+        const logoImg = document.getElementById("invoiceLogoImg");
+        const logoNone = document.getElementById("invoiceLogoNone");
+        if (c.logoPath) {
+          logoImg.src = "/api/invoice-config/logo?t=" + Date.now();
+          logoImg.style.display = "";
+          logoNone.style.display = "none";
+        } else {
+          logoImg.src = "";
+          logoImg.style.display = "none";
+          logoNone.style.display = "";
+        }
+      } catch (e) {
+        console.warn("Invoice config load failed", e);
+      }
+    }
+
+    // PDF Viewer functions - supports both expenses and sales, and local File (before save)
+    let currentViewerType = null; // 'expense' or 'sale'
+    let currentViewerId = null;
+    let currentViewerBlobUrl = null;
+
+    function openPdfViewerFromFile(file) {
+      if (!file) return;
+      const modal = document.getElementById("pdfViewerModal");
+      const pdfObject = document.getElementById("pdfViewerObject");
+      const img = document.getElementById("pdfViewerImage");
+      const placeholder = document.getElementById("pdfViewerPlaceholder");
+      const downloadLink = document.getElementById("pdfViewerDownload");
+      const fileNameLabel = document.getElementById("pdfViewerFileName");
+
+      if (currentViewerBlobUrl) {
+        URL.revokeObjectURL(currentViewerBlobUrl);
+        currentViewerBlobUrl = null;
+      }
+      currentViewerBlobUrl = URL.createObjectURL(file);
+      currentViewerType = null;
+      currentViewerId = null;
+
+      pdfObject.style.display = "none";
+      pdfObject.data = "";
+      img.style.display = "none";
+      img.src = "";
+      placeholder.style.display = "block";
+      placeholder.innerHTML = `
+        <div style="font-size: 48px; margin-bottom: 16px;">📄</div>
+        <div>Loading document...</div>
+      `;
+      fileNameLabel.textContent = file.name || "Selected file";
+      downloadLink.href = currentViewerBlobUrl;
+      downloadLink.download = file.name || "document";
+      downloadLink.style.display = "inline-block";
+      modal.classList.remove("hidden");
+
+      const mime = (file.type || "").toLowerCase();
+      if (mime === "application/pdf") {
+        pdfObject.data = currentViewerBlobUrl;
+        pdfObject.style.display = "block";
+        placeholder.style.display = "none";
+      } else if (mime.startsWith("image/")) {
+        img.onload = () => {
+          placeholder.style.display = "none";
+          img.style.display = "block";
+        };
+        img.onerror = () => {
+          placeholder.innerHTML = `
+            <div style="font-size: 48px; margin-bottom: 16px;">❌</div>
+            <div>Could not load image preview.</div>
+          `;
+        };
+        img.src = currentViewerBlobUrl;
+      } else {
+        placeholder.innerHTML = `
+          <div style="font-size: 48px; margin-bottom: 16px;">📎</div>
+          <div>Preview not available for this file type.</div>
+          <div class="small" style="margin-top: 8px;">${mime || "Unknown type"}</div>
+        `;
+      }
+    }
+
+    async function openPdfViewer(id, type = 'expense') {
+      try {
+        currentViewerType = type;
+        currentViewerId = id;
+
+        const endpoint = type === 'sale'
+          ? `/api/sales/${id}/file-info`
+          : `/api/expenses/${id}/file-info`;
+
+        const info = await apiGet(endpoint);
+        const modal = document.getElementById("pdfViewerModal");
+        const pdfObject = document.getElementById("pdfViewerObject");
+        const img = document.getElementById("pdfViewerImage");
+        const placeholder = document.getElementById("pdfViewerPlaceholder");
+        const downloadLink = document.getElementById("pdfViewerDownload");
+        const fileNameLabel = document.getElementById("pdfViewerFileName");
+
+        // Reset all viewers
+        pdfObject.style.display = "none";
+        pdfObject.data = "";
+        img.style.display = "none";
+        img.src = "";
+        placeholder.style.display = "block";
+        placeholder.innerHTML = `
+          <div style="font-size: 48px; margin-bottom: 16px;">📄</div>
+          <div>Loading document...</div>
+        `;
+
+        fileNameLabel.textContent = info.fileName || 'Unknown file';
+        downloadLink.href = info.url;
+        downloadLink.textContent = `Download ${info.fileName || 'file'}`;
+
+        modal.classList.remove("hidden");
+
+        if (info.mimeType === "application/pdf") {
+          // Use object tag for PDFs - more reliable than iframe
+          pdfObject.data = info.url;
+          pdfObject.style.display = "block";
+          placeholder.style.display = "none";
+        } else if (info.mimeType.startsWith("image/")) {
+          // Use img tag for images with proper styling
+          img.src = info.url;
+          img.style.display = "block";
+          img.style.maxWidth = "100%";
+          img.style.height = "auto";
+          img.style.objectFit = "contain";
+          placeholder.style.display = "none";
+        } else {
+          // Unsupported file type
+          placeholder.innerHTML = `
+            <div style="font-size: 48px; margin-bottom: 16px;">📎</div>
+            <div>Preview not available for this file type.</div>
+            <div class="small" style="margin-top: 8px;">${info.mimeType || 'Unknown type'}</div>
+          `;
+        }
+      } catch (e) {
+        const modal = document.getElementById("pdfViewerModal");
+        const placeholder = document.getElementById("pdfViewerPlaceholder");
+        const downloadLink = document.getElementById("pdfViewerDownload");
+
+        placeholder.innerHTML = `
+          <div style="font-size: 48px; margin-bottom: 16px;">❌</div>
+          <div>Could not load file preview.</div>
+          <div class="small" style="margin-top: 8px; color: var(--danger);">${e.message || 'Unknown error'}</div>
+        `;
+        downloadLink.style.display = 'none';
+        modal.classList.remove("hidden");
+      }
+    }
+
+    function closePdfViewer() {
+      const modal = document.getElementById("pdfViewerModal");
+      const pdfObject = document.getElementById("pdfViewerObject");
+      const img = document.getElementById("pdfViewerImage");
+      const downloadLink = document.getElementById("pdfViewerDownload");
+
+      if (currentViewerBlobUrl) {
+        URL.revokeObjectURL(currentViewerBlobUrl);
+        currentViewerBlobUrl = null;
+      }
+      pdfObject.data = "";
+      img.src = "";
+      downloadLink.href = "#";
+      downloadLink.style.display = "inline-block";
+      currentViewerType = null;
+      currentViewerId = null;
+
+      modal.classList.add("hidden");
+    }
+
+    // VAT Reports functions
+    async function loadVatReport() {
+      const year = document.getElementById("vatYear").value;
+      const quarter = document.getElementById("vatQuarter").value;
+
+      try {
+        const report = await apiGet(`/api/reports/vat/quarterly?year=${year}&quarter=${quarter}`);
+
+        document.getElementById("vatSummary").style.display = "block";
+
+        // Update summary cards
+        document.getElementById("vatSalesAmount").textContent = money(report.sales.vatAmount) + " EUR";
+        document.getElementById("vatExpensesAmount").textContent = money(report.expenses.vatAmount) + " EUR";
+        document.getElementById("vatNetPosition").textContent = money(Math.abs(report.vatPosition.netPosition)) + " EUR";
+
+        const statusEl = document.getElementById("vatStatus");
+        if (report.vatPosition.status === "to_pay") {
+          statusEl.textContent = "VAT TO PAY";
+          statusEl.style.color = "var(--danger)";
+          document.getElementById("vatNetPosition").style.color = "var(--danger)";
+        } else if (report.vatPosition.status === "to_receive") {
+          statusEl.textContent = "VAT TO RECEIVE";
+          statusEl.style.color = "var(--ok)";
+          document.getElementById("vatNetPosition").style.color = "var(--ok)";
+        } else {
+          statusEl.textContent = "BALANCED";
+          statusEl.style.color = "var(--muted)";
+          document.getElementById("vatNetPosition").style.color = "var(--text)";
+        }
+
+        // Update sales summary
+        document.getElementById("vatSalesNet").textContent = money(report.sales.netAmount);
+        document.getElementById("vatSalesVat").textContent = money(report.sales.vatAmount);
+        document.getElementById("vatSalesGross").textContent = money(report.sales.grossAmount);
+        document.getElementById("vatInvoiceCount").textContent = report.sales.invoiceCount;
+
+        // Update expenses summary
+        document.getElementById("vatExpensesNet").textContent = money(report.expenses.netAmount);
+        document.getElementById("vatExpensesVat").textContent = money(report.expenses.vatAmount);
+        document.getElementById("vatExpensesTotal").textContent = money(report.expenses.netAmount + report.expenses.vatAmount);
+        document.getElementById("vatExpenseCount").textContent = report.expenses.expenseCount;
+
+        // Update category breakdown table
+        const categoryRows = document.getElementById("vatCategoryRows");
+        categoryRows.innerHTML = "";
+        report.categoryBreakdown.forEach(cat => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td>${cat.category}</td>
+            <td>${cat.count}</td>
+            <td>${money(cat.netAmount)}</td>
+            <td>${money(cat.vatAmount)}</td>
+            <td>${money(cat.netAmount + cat.vatAmount)}</td>
+          `;
+          categoryRows.appendChild(tr);
+        });
+
+        // Render category chart
+        renderVatCategoryChart(report.categoryBreakdown);
+
+        // Update monthly breakdown table
+        const monthlyRows = document.getElementById("vatMonthlyRows");
+        monthlyRows.innerHTML = "";
+        report.monthlyBreakdown.forEach(month => {
+          const tr = document.createElement("tr");
+          const netColor = month.netPosition > 0 ? 'color:var(--danger);' : month.netPosition < 0 ? 'color:var(--ok);' : '';
+          tr.innerHTML = `
+            <td>${month.month}</td>
+            <td>${money(month.vatInvoiced)}</td>
+            <td>${money(month.vatFromExpenses)}</td>
+            <td style="${netColor}">${money(Math.abs(month.netPosition))}</td>
+          `;
+          monthlyRows.appendChild(tr);
+        });
+
+      } catch (e) {
+        alert("Failed to load VAT report: " + (e.message || "Unknown error"));
+      }
+    }
+
+    function renderVatCategoryChart(categoryData) {
+      const ctx = document.getElementById("vatCategoryChart");
+      if (!ctx || !window.Chart) return;
+
+      if (vatCategoryChartInstance) vatCategoryChartInstance.destroy();
+
+      const labels = categoryData.map(c => c.category);
+      const values = categoryData.map(c => c.totalAmount || c.netAmount + c.vatAmount);
+
+      const colors = [
+        '#2d66d7', '#159767', '#cb3340', '#f5a623', '#9013fe',
+        '#7ed321', '#50e3c2', '#b8e986', '#bd10e0', '#417505'
+      ];
+
+      vatCategoryChartInstance = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels,
+          datasets: [{
+            data: values,
+            backgroundColor: colors,
+            borderWidth: 2,
+            borderColor: '#fff',
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'right' },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  const value = context.raw;
+                  const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                  const pct = ((value / total) * 100).toFixed(1);
+                  return `${money(value)} (${pct}%)`;
+                }
+              }
+            }
+          }
+        }
+      });
+    }
+
+    async function loadYearlyVatReport() {
+      const year = document.getElementById("vatYear").value || new Date().getFullYear();
+      try {
+        const report = await apiGet(`/api/reports/vat/yearly?year=${year}`);
+
+        const summaryEl = document.getElementById("vatYearlySummary");
+        let html = `<div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;">`;
+        report.quarters.forEach(q => {
+          const statusColor = q.status === 'to_pay' ? 'var(--danger)' : q.status === 'to_receive' ? 'var(--ok)' : 'var(--muted)';
+          const statusText = q.status === 'to_pay' ? 'To Pay' : q.status === 'to_receive' ? 'To Receive' : 'Balanced';
+          html += `
+            <div class="panel" style="margin: 0; padding: 12px;">
+              <div style="font-size: 14px; font-weight: bold;">Q${q.quarter}</div>
+              <div style="font-size: 12px; color: var(--muted);">${q.period.from} to ${q.period.to}</div>
+              <div style="font-size: 16px; margin-top: 8px; color: ${statusColor};">${money(Math.abs(q.netPosition))}</div>
+              <div style="font-size: 11px; color: ${statusColor};">${statusText}</div>
+            </div>
+          `;
+        });
+        html += `</div>`;
+        summaryEl.innerHTML = html;
+
+        // Render yearly chart
+        const ctx = document.getElementById("vatYearlyChart");
+        if (ctx && window.Chart) {
+          if (vatYearlyChartInstance) vatYearlyChartInstance.destroy();
+
+          vatYearlyChartInstance = new Chart(ctx, {
+            type: 'bar',
+            data: {
+              labels: report.quarters.map(q => `Q${q.quarter}`),
+              datasets: [
+                {
+                  label: 'VAT from Sales',
+                  data: report.quarters.map(q => q.vatInvoiced),
+                  backgroundColor: '#cb3340',
+                },
+                {
+                  label: 'VAT from Expenses',
+                  data: report.quarters.map(q => q.vatFromExpenses),
+                  backgroundColor: '#159767',
+                },
+                {
+                  label: 'Net Position',
+                  data: report.quarters.map(q => q.netPosition),
+                  backgroundColor: '#2d66d7',
+                }
+              ]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              scales: {
+                y: { beginAtZero: true, ticks: { callback: (v) => v + ' EUR' } }
+              }
+            }
+          });
+        }
+      } catch (e) {
+        console.warn("Failed to load yearly VAT report", e);
+      }
+    }
+
+    async function saveInvoiceConfig(event) {
+      event.preventDefault();
+      const c = {
+        companyName: document.getElementById("cfgCompanyName").value.trim(),
+        tagline: document.getElementById("cfgTagline").value.trim(),
+        email: document.getElementById("cfgEmail").value.trim(),
+        vatNumber: document.getElementById("cfgVatNumber").value.trim(),
+        companyNumber: document.getElementById("cfgCompanyNumber").value.trim(),
+        address: document.getElementById("cfgAddress").value.trim(),
+        footer: document.getElementById("cfgFooter").value.trim(),
+      };
+      const updated = await apiPut("/api/invoice-config", c);
+      invoiceConfig = { ...updated, logoPath: invoiceConfig.logoPath || updated.logoPath || "" };
+    }
+
+    async function uploadLogo() {
+      const input = document.getElementById("cfgLogoFile");
+      const file = input.files[0];
+      if (!file) return;
+      const formData = new FormData();
+      formData.append("file", file);
+      const r = await apiPostForm("/api/invoice-config/logo", formData);
+      invoiceConfig.logoPath = r.logoPath || "";
+      const logoImg = document.getElementById("invoiceLogoImg");
+      const logoNone = document.getElementById("invoiceLogoNone");
+      logoImg.src = "/api/invoice-config/logo?t=" + Date.now();
+      logoImg.style.display = "";
+      logoNone.style.display = "none";
+      input.value = "";
+    }
+
+    async function getLogoDataUrl() {
+      const r = await fetch("/api/invoice-config/logo", { credentials: "same-origin" });
+      if (!r.ok) return null;
+      const blob = await r.blob();
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    }
+
+    function resizeLogoForPdf(dataUrl, maxSize) {
+      maxSize = maxSize || 144;
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.onload = function () {
+          const c = document.createElement("canvas");
+          c.width = maxSize;
+          c.height = maxSize;
+          const ctx = c.getContext("2d");
+          ctx.fillStyle = "#fff";
+          ctx.fillRect(0, 0, maxSize, maxSize);
+          ctx.drawImage(img, 0, 0, maxSize, maxSize);
+          try {
+            resolve(c.toDataURL("image/jpeg", 0.85));
+          } catch (e) {
+            resolve(c.toDataURL("image/png"));
+          }
+        };
+        img.onerror = () => resolve(dataUrl);
+        img.src = dataUrl;
+      });
+    }
+
+    async function generateInvoicePdf(saleId) {
+      const sale = data.sales.find((s) => s.id === saleId);
+      if (!sale) return;
+      const jspdf = window.jspdf;
+      if (!jspdf || !jspdf.jsPDF) {
+        alert("PDF library unavailable. Please refresh and try again.");
+        return;
+      }
+      const c = invoiceConfig;
+      let logoDataUrl = c.logoPath ? await getLogoDataUrl() : null;
+      if (logoDataUrl && logoDataUrl.indexOf("data:") === 0) {
+        logoDataUrl = await resizeLogoForPdf(logoDataUrl, 144);
+      }
+      const doc = new jspdf.jsPDF({ unit: "pt", format: "a4", compress: true });
+      const pageW = 595;
+      const margin = 50;
+      const rightCol = 380;
+      const barH = 28;
+      doc.setFillColor(0, 0, 0);
+      doc.rect(0, 0, pageW, barH, "F");
+      doc.setTextColor(255, 255, 255);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(18);
+      doc.text("INVOICE", pageW / 2, barH / 2 + 4, { align: "center" });
+      doc.setTextColor(0, 0, 0);
+
+      let y = barH + 20;
+      if (logoDataUrl) {
+        try {
+          doc.addImage(logoDataUrl, "JPEG", margin, y, 72, 72);
+        } catch (e) {
+          try {
+            doc.addImage(logoDataUrl, "PNG", margin, y, 72, 72);
+          } catch (e2) {
+            console.warn("Logo image failed", e2);
+          }
+        }
+      }
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10);
+      const rightColWidth = pageW - margin - rightCol;
+      if (c.address) {
+        const addrLines = doc.splitTextToSize(c.address, rightColWidth);
+        addrLines.forEach(function (line) {
+          doc.text(line, rightCol, y);
+          y += 12;
+        });
+      }
+      if (c.vatNumber) {
+        doc.text("BTW " + c.vatNumber, rightCol, y);
+        y += 12;
+      }
+      if (c.companyNumber) {
+        doc.text("KVK " + c.companyNumber, rightCol, y);
+        y += 12;
+      }
+      doc.text(c.email || "", rightCol, y);
+      y += 20;
+
+      const logoBottom = barH + 20 + 72;
+      y = Math.max(y, logoBottom + 24);
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "bold");
+      doc.text("Bill to", margin, y);
+      doc.text("Invoice details", rightCol, y);
+      y += 14;
+      const rightColY = y;
+      doc.setFont("helvetica", "normal");
+      doc.text(sale.customer, margin, y);
+      y += 12;
+      const custAddr = (sale.customerAddress || "").trim();
+      if (custAddr) {
+        const addrLines = doc.splitTextToSize(custAddr, 220);
+        addrLines.forEach(function (line) {
+          doc.text(line, margin, y);
+          y += 12;
+        });
+      }
+      if ((sale.customerEmail || "").trim()) {
+        doc.text(sale.customerEmail.trim(), margin, y);
+        y += 12;
+      }
+      doc.text("Invoice: " + sale.invoiceNo, rightCol, rightColY);
+      const issueDateOnly = (sale.issueDate || "").toString().slice(0, 10);
+      const dueDateOnly = (sale.dueDate || "").toString().slice(0, 10);
+      doc.text("Order date: " + issueDateOnly, rightCol, rightColY + 12);
+      doc.text("Due date: " + dueDateOnly, rightCol, rightColY + 24);
+      y = Math.max(y, rightColY + 36) + 12;
+
+      const col1 = margin;
+      const col2 = 380;
+      const col3 = 495;
+      const tableW = pageW - 2 * margin;
+      const rowH = 18;
+      const pdfLineVat = (amount, rate) => Math.round(amount * (Number(rate) / 100) * 100) / 100;
+      const lines = Array.isArray(sale.lines) && sale.lines.length > 0
+        ? sale.lines.map((l) => ({
+            description: l.description || "-",
+            amount: Number(l.amount) || 0,
+            vatRate: Number(l.vatRate) || 0,
+            vatAmount: pdfLineVat(Number(l.amount) || 0, Number(l.vatRate) || 0),
+          }))
+        : [{ description: sale.description || "Invoice items", amount: Number(sale.subtotal) || 0, vatRate: 21, vatAmount: Number(sale.vat) || 0 }];
+      let netSum = 0, vatSum = 0;
+      lines.forEach((l) => { netSum += l.amount; vatSum += l.vatAmount; });
+      netSum = Math.round(netSum * 100) / 100;
+      vatSum = Math.round(vatSum * 100) / 100;
+
+      doc.setFillColor(40, 40, 40);
+      doc.rect(col1, y, tableW, rowH, "F");
+      doc.setTextColor(255, 255, 255);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10);
+      doc.text("Description", col1 + 6, y + 12);
+      doc.text("Amount", col2 + 4, y + 12);
+      doc.text("VAT", col3, y + 12);
+      y += rowH;
+      doc.setTextColor(0, 0, 0);
+      doc.setFont("helvetica", "normal");
+      doc.setDrawColor(220, 220, 220);
+      const descTopPadding = 10;
+      for (const line of lines) {
+        const descLines = doc.splitTextToSize(line.description, col2 - col1 - 12);
+        const dataRowH = Math.max(rowH, descLines.length * 12 + descTopPadding + 8);
+        doc.line(col1, y, margin + tableW, y);
+        doc.line(col2, y, col2, y + dataRowH);
+        doc.line(col3, y, col3, y + dataRowH);
+        doc.line(margin + tableW, y, margin + tableW, y + dataRowH);
+        doc.text(descLines, col1 + 6, y + descTopPadding + 12);
+        doc.text(money(line.amount), col2 + 4, y + dataRowH / 2 + 4);
+        doc.text(money(line.vatAmount), col3, y + dataRowH / 2 + 4);
+        doc.line(col1, y + dataRowH, margin + tableW, y + dataRowH);
+        y += dataRowH;
+      }
+      doc.setDrawColor(0, 0, 0);
+      doc.line(col1, y, tableW, y);
+      y += 20;
+
+      const sumRight = margin + tableW - 10;
+      doc.setFont("helvetica", "normal");
+      doc.text("Net amount " + money(netSum), sumRight, y, { align: "right" });
+      y += 16;
+      doc.text("VAT " + money(vatSum), sumRight, y, { align: "right" });
+      y += 16;
+      doc.setFont("helvetica", "bold");
+      doc.text("Total " + money(netSum + vatSum), sumRight, y, { align: "right" });
+      y += 28;
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.setTextColor(80, 80, 80);
+      const footerText = (c.footer || "").trim() || "Thank you for your business.";
+      const footerLines = footerText.split(/\r?\n/).filter(Boolean);
+      let footerY = 795;
+      footerLines.forEach(function (line) {
+        doc.text(line, pageW / 2, footerY, { align: "center" });
+        footerY += 11;
+      });
+      if (sale.voided) {
+        doc.setFontSize(48);
+        doc.setTextColor(180, 0, 0);
+        doc.setFont("helvetica", "bold");
+        doc.text("VOIDED", pageW / 2, 400, { align: "center" });
+        doc.setTextColor(0, 0, 0);
+      }
+      doc.save("invoice-" + sale.invoiceNo + ".pdf");
+    }
+
+    document.querySelectorAll(".tab-btn[data-tab]").forEach((btn) => {
+      btn.addEventListener("click", () => switchTab(btn.dataset.tab));
+    });
+    document.querySelectorAll(".dashboard-period").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        dashboardPeriod = btn.dataset.period || "month";
+        document.querySelectorAll(".dashboard-period").forEach((b) => b.classList.toggle("active", b.dataset.period === dashboardPeriod));
+        loadDashboard();
+      });
+    });
+    addSaleLine();
+    document.getElementById("saleAddLine").addEventListener("click", addSaleLine);
+    document.getElementById("expenseForm").addEventListener("submit", onExpenseSubmit);
+    document.getElementById("expenseFormEditCancel").addEventListener("click", clearExpenseEditMode);
+    document.getElementById("expenseFile").addEventListener("change", onExpenseFileChange);
+    document.getElementById("btnPreviewExpenseFile").addEventListener("click", () => {
+      const file = document.getElementById("expenseFile").files[0];
+      if (file) openPdfViewerFromFile(file);
+      else alert("Please select a file first.");
+    });
+    document.getElementById("expenseInvoiceNumber").addEventListener("input", scheduleExpenseDuplicateCheck);
+    document.getElementById("expenseInvoiceNumber").addEventListener("blur", scheduleExpenseDuplicateCheck);
+    document.getElementById("expenseSupplierSelect").addEventListener("change", scheduleExpenseDuplicateCheck);
+    document.getElementById("btnExtractInvoice").addEventListener("click", onExtractInvoice);
+    (function () {
+      let expenseSearchTimeout;
+      document.getElementById("expenseSearch").addEventListener("input", function () {
+        clearTimeout(expenseSearchTimeout);
+        const term = this.value.trim();
+        expenseSearchTimeout = setTimeout(async () => {
+          expenseSearchTerm = term;
+          await loadExpenses(expenseSearchTerm);
+        }, 280);
+      });
+    })();
+    document.getElementById("invoiceSettingsForm").addEventListener("submit", saveInvoiceConfig);
+    document.getElementById("cfgLogoUpload").addEventListener("click", uploadLogo);
+    document.getElementById("bankCsvImport").addEventListener("click", async function () {
+      const input = document.getElementById("bankCsvFile");
+      const resultEl = document.getElementById("bankCsvResult");
+      resultEl.textContent = "";
+      const file = input.files[0];
+      if (!file) {
+        resultEl.textContent = "Select a CSV file first.";
+        return;
+      }
+      const formData = new FormData();
+      formData.append("file", file);
+      try {
+        const r = await apiPostForm("/api/bank-transactions/import", formData);
+        resultEl.textContent = "Imported " + (r.imported || 0) + " transaction(s).";
+        input.value = "";
+        data.bankTransactions = await apiGet("/api/bank-transactions");
+        renderBank();
+        renderReconciliation();
+      } catch (e) {
+        resultEl.textContent = "Error: " + (e.message || "Import failed");
+      }
+    });
+    document.getElementById("saleForm").addEventListener("submit", onSaleSubmit);
+    document.getElementById("saleFormEditCancel").addEventListener("click", clearSaleEditMode);
+    document.getElementById("bankForm").addEventListener("submit", onBankSubmit);
+    document.getElementById("saleRows").addEventListener("click", (event) => {
+      const btn = event.target.closest("button[data-action='pdf']");
+      if (btn) {
+        generateInvoicePdf(btn.dataset.id);
+        return;
+      }
+      const editBtn = event.target.closest("button[data-action='edit']");
+      if (editBtn) {
+        const sale = data.sales.find((s) => s.id === editBtn.dataset.id);
+        if (sale) openSaleInForm(sale);
+        return;
+      }
+      const voidBtn = event.target.closest("button[data-action='void']");
+      if (voidBtn) {
+        voidSale(voidBtn.dataset.id);
+      }
+    });
+    document.getElementById("saleEditForm").addEventListener("submit", onSaleEditSubmit);
+    document.getElementById("saleEditCancel").addEventListener("click", () => {
+      document.getElementById("saleEditModal").classList.add("hidden");
+    });
+    document.getElementById("saleEditModal").addEventListener("click", (e) => {
+      if (e.target.id === "saleEditModal") document.getElementById("saleEditModal").classList.add("hidden");
+    });
+    document.getElementById("reconMatchSelected").addEventListener("click", performReconMatchSelected);
+    document.getElementById("reconRows").addEventListener("change", (event) => {
+      if (event.target.classList.contains("recon-open-cb")) {
+        updateReconMatchButton();
+      }
+    });
+    document.getElementById("reconPairedRows").addEventListener("click", async (event) => {
+      const unmatchBtn = event.target.closest("button[data-action='unmatch']");
+      if (unmatchBtn) {
+        await unmatchTransaction(unmatchBtn.dataset.txId);
+      }
+    });
+
+    // Reconciliation view toggle handlers
+    document.getElementById("reconViewOpen").addEventListener("click", () => {
+      reconciliationView = 'open';
+      document.getElementById("reconViewOpen").classList.add("active");
+      document.getElementById("reconViewPaired").classList.remove("active");
+      renderReconciliation();
+    });
+    document.getElementById("reconViewPaired").addEventListener("click", () => {
+      reconciliationView = 'paired';
+      document.getElementById("reconViewPaired").classList.add("active");
+      document.getElementById("reconViewOpen").classList.remove("active");
+      renderReconciliation();
+    });
+
+    document.getElementById("btnLogout").addEventListener("click", async () => {
+      await fetch("/api/auth/logout", { method: "POST", credentials: "same-origin" });
+      window.location.href = "/login";
+    });
+
+    const changePasswordModal = document.getElementById("changePasswordModal");
+    const changePasswordError = document.getElementById("changePasswordError");
+    document.getElementById("btnChangePassword").addEventListener("click", () => {
+      changePasswordError.style.display = "none";
+      document.getElementById("changePasswordForm").reset();
+      changePasswordModal.classList.remove("hidden");
+    });
+    document.getElementById("changePasswordCancel").addEventListener("click", () => changePasswordModal.classList.add("hidden"));
+    changePasswordModal.addEventListener("click", (e) => {
+      if (e.target === changePasswordModal) changePasswordModal.classList.add("hidden");
+    });
+    document.getElementById("changePasswordForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      changePasswordError.style.display = "none";
+      const newP = document.getElementById("changePasswordNew").value;
+      const confirmP = document.getElementById("changePasswordConfirm").value;
+      if (newP !== confirmP) {
+        changePasswordError.textContent = "New password and confirmation do not match.";
+        changePasswordError.style.display = "block";
+        return;
+      }
+      const res = await fetch("/api/auth/change-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({
+          currentPassword: document.getElementById("changePasswordCurrent").value,
+          newPassword: newP
+        })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        changePasswordModal.classList.add("hidden");
+        return;
+      }
+      changePasswordError.textContent = data.error || "Failed to change password.";
+      changePasswordError.style.display = "block";
+    });
+
+    const createUserModal = document.getElementById("createUserModal");
+    const createUserError = document.getElementById("createUserError");
+    document.getElementById("btnCreateUser").addEventListener("click", () => {
+      createUserError.style.display = "none";
+      document.getElementById("createUserForm").reset();
+      createUserModal.classList.remove("hidden");
+    });
+    document.getElementById("createUserCancel").addEventListener("click", () => createUserModal.classList.add("hidden"));
+    createUserModal.addEventListener("click", (e) => {
+      if (e.target === createUserModal) createUserModal.classList.add("hidden");
+    });
+    document.getElementById("createUserForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      createUserError.style.display = "none";
+      const newP = document.getElementById("createUserPassword").value;
+      const confirmP = document.getElementById("createUserPasswordConfirm").value;
+      if (newP !== confirmP) {
+        createUserError.textContent = "Password and confirmation do not match.";
+        createUserError.style.display = "block";
+        return;
+      }
+      const res = await fetch("/api/auth/create-user", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({
+          email: document.getElementById("createUserEmail").value.trim(),
+          password: newP
+        })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        createUserModal.classList.add("hidden");
+        return;
+      }
+      createUserError.textContent = data.error || "Failed to create user.";
+      createUserError.style.display = "block";
+    });
+
+    // Customer select change handler
+    document.getElementById("saleCustomerSelect").addEventListener("change", (e) => {
+      populateCustomerDetails(e.target.value);
+    });
+
+    // Supplier select change handler
+    document.getElementById("expenseSupplierSelect").addEventListener("change", (e) => {
+      populateSupplierDetails(e.target.value);
+    });
+
+    // Customer form handlers
+    async function onCustomerSubmit(event) {
+      event.preventDefault();
+      try {
+        const created = await apiPost("/api/customers", {
+          name: document.getElementById("customerName").value.trim(),
+          email: document.getElementById("customerEmail").value.trim(),
+          phone: document.getElementById("customerPhone").value.trim(),
+          vatNumber: document.getElementById("customerVatNumber").value.trim(),
+          companyNumber: document.getElementById("customerCompanyNumber").value.trim(),
+          address: document.getElementById("customerAddress").value.trim(),
+          notes: document.getElementById("customerNotes").value.trim(),
+        });
+        data.customers.push(created);
+        document.getElementById("customerForm").reset();
+        renderAll();
+      } catch (e) {
+        alert(e.message || "Failed to save customer.");
+      }
+    }
+
+    async function onCustomerEditSubmit(event) {
+      event.preventDefault();
+      const id = document.getElementById("customerEditId").value;
+      const errEl = document.getElementById("customerEditError");
+      errEl.style.display = "none";
+      try {
+        const updated = await apiPut("/api/customers/" + id, {
+          name: document.getElementById("customerEditName").value.trim(),
+          email: document.getElementById("customerEditEmail").value.trim(),
+          phone: document.getElementById("customerEditPhone").value.trim(),
+          vatNumber: document.getElementById("customerEditVatNumber").value.trim(),
+          companyNumber: document.getElementById("customerEditCompanyNumber").value.trim(),
+          address: document.getElementById("customerEditAddress").value.trim(),
+          notes: document.getElementById("customerEditNotes").value.trim(),
+        });
+        const idx = data.customers.findIndex((c) => c.id === id);
+        if (idx >= 0) data.customers[idx] = updated;
+        document.getElementById("customerEditModal").classList.add("hidden");
+        renderAll();
+      } catch (e) {
+        errEl.textContent = e.message || "Failed to update customer.";
+        errEl.style.display = "block";
+      }
+    }
+
+    function openCustomerEditModal(customer) {
+      document.getElementById("customerEditId").value = customer.id;
+      document.getElementById("customerEditName").value = customer.name || "";
+      document.getElementById("customerEditEmail").value = customer.email || "";
+      document.getElementById("customerEditPhone").value = customer.phone || "";
+      document.getElementById("customerEditVatNumber").value = customer.vatNumber || "";
+      document.getElementById("customerEditCompanyNumber").value = customer.companyNumber || "";
+      document.getElementById("customerEditAddress").value = customer.address || "";
+      document.getElementById("customerEditNotes").value = customer.notes || "";
+      document.getElementById("customerEditError").style.display = "none";
+      document.getElementById("customerEditModal").classList.remove("hidden");
+    }
+
+    async function deleteCustomer(customerId) {
+      if (!confirm("Delete this customer? This will unlink them from any invoices.")) return;
+      try {
+        await apiDelete("/api/customers/" + customerId);
+        data.customers = data.customers.filter((c) => c.id !== customerId);
+        renderAll();
+      } catch (e) {
+        alert(e.message || "Failed to delete customer.");
+      }
+    }
+
+    document.getElementById("customerForm").addEventListener("submit", onCustomerSubmit);
+    document.getElementById("customerEditForm").addEventListener("submit", onCustomerEditSubmit);
+    document.getElementById("customerEditCancel").addEventListener("click", () => {
+      document.getElementById("customerEditModal").classList.add("hidden");
+    });
+    document.getElementById("customerEditModal").addEventListener("click", (e) => {
+      if (e.target.id === "customerEditModal") document.getElementById("customerEditModal").classList.add("hidden");
+    });
+    document.getElementById("customerRows").addEventListener("click", (event) => {
+      const editBtn = event.target.closest("button[data-action='edit-customer']");
+      if (editBtn) {
+        const customer = data.customers.find((c) => c.id === editBtn.dataset.id);
+        if (customer) openCustomerEditModal(customer);
+        return;
+      }
+      const deleteBtn = event.target.closest("button[data-action='delete-customer']");
+      if (deleteBtn) {
+        deleteCustomer(deleteBtn.dataset.id);
+      }
+    });
+
+    // Supplier form handlers
+    async function onSupplierSubmit(event) {
+      event.preventDefault();
+      try {
+        const categoryId = document.getElementById("supplierCategory").value || null;
+        const created = await apiPost("/api/suppliers", {
+          name: document.getElementById("supplierName").value.trim(),
+          email: document.getElementById("supplierEmail").value.trim(),
+          phone: document.getElementById("supplierPhone").value.trim(),
+          vatNumber: document.getElementById("supplierVatNumber").value.trim(),
+          companyNumber: document.getElementById("supplierCompanyNumber").value.trim(),
+          address: document.getElementById("supplierAddress").value.trim(),
+          notes: document.getElementById("supplierNotes").value.trim(),
+          categoryId: categoryId,
+        });
+        data.suppliers.push(created);
+        document.getElementById("supplierForm").reset();
+        renderAll();
+      } catch (e) {
+        alert(e.message || "Failed to save supplier.");
+      }
+    }
+
+    async function onSupplierEditSubmit(event) {
+      event.preventDefault();
+      const id = document.getElementById("supplierEditId").value;
+      const errEl = document.getElementById("supplierEditError");
+      errEl.style.display = "none";
+      try {
+        const categoryId = document.getElementById("supplierEditCategory").value || null;
+        const updated = await apiPut("/api/suppliers/" + id, {
+          name: document.getElementById("supplierEditName").value.trim(),
+          email: document.getElementById("supplierEditEmail").value.trim(),
+          phone: document.getElementById("supplierEditPhone").value.trim(),
+          vatNumber: document.getElementById("supplierEditVatNumber").value.trim(),
+          companyNumber: document.getElementById("supplierEditCompanyNumber").value.trim(),
+          address: document.getElementById("supplierEditAddress").value.trim(),
+          notes: document.getElementById("supplierEditNotes").value.trim(),
+          categoryId: categoryId,
+        });
+        const idx = data.suppliers.findIndex((s) => s.id === id);
+        if (idx >= 0) data.suppliers[idx] = updated;
+        document.getElementById("supplierEditModal").classList.add("hidden");
+        renderAll();
+      } catch (e) {
+        errEl.textContent = e.message || "Failed to update supplier.";
+        errEl.style.display = "block";
+      }
+    }
+
+    function openSupplierEditModal(supplier) {
+      document.getElementById("supplierEditId").value = supplier.id;
+      document.getElementById("supplierEditName").value = supplier.name || "";
+      document.getElementById("supplierEditEmail").value = supplier.email || "";
+      document.getElementById("supplierEditPhone").value = supplier.phone || "";
+      document.getElementById("supplierEditVatNumber").value = supplier.vatNumber || "";
+      document.getElementById("supplierEditCompanyNumber").value = supplier.companyNumber || "";
+      document.getElementById("supplierEditCategory").value = supplier.categoryId || "";
+      document.getElementById("supplierEditAddress").value = supplier.address || "";
+      document.getElementById("supplierEditNotes").value = supplier.notes || "";
+      document.getElementById("supplierEditError").style.display = "none";
+      document.getElementById("supplierEditModal").classList.remove("hidden");
+    }
+
+    async function deleteSupplier(supplierId) {
+      if (!confirm("Delete this supplier? This will unlink them from any expenses.")) return;
+      try {
+        await apiDelete("/api/suppliers/" + supplierId);
+        data.suppliers = data.suppliers.filter((s) => s.id !== supplierId);
+        renderAll();
+      } catch (e) {
+        alert(e.message || "Failed to delete supplier.");
+      }
+    }
+
+    async function deleteExpense(expenseId) {
+      if (!confirm("Delete this expense? This action cannot be undone.")) return;
+      try {
+        await apiDelete("/api/expenses/" + expenseId);
+        data.expenses = data.expenses.filter((e) => e.id !== expenseId);
+        renderAll();
+      } catch (e) {
+        alert(e.message || "Failed to delete expense.");
+      }
+    }
+
+    document.getElementById("supplierForm").addEventListener("submit", onSupplierSubmit);
+    document.getElementById("supplierEditForm").addEventListener("submit", onSupplierEditSubmit);
+    document.getElementById("supplierEditCancel").addEventListener("click", () => {
+      document.getElementById("supplierEditModal").classList.add("hidden");
+    });
+    document.getElementById("supplierEditModal").addEventListener("click", (e) => {
+      if (e.target.id === "supplierEditModal") document.getElementById("supplierEditModal").classList.add("hidden");
+    });
+    document.getElementById("supplierRows").addEventListener("click", (event) => {
+      const editBtn = event.target.closest("button[data-action='edit-supplier']");
+      if (editBtn) {
+        const supplier = data.suppliers.find((s) => s.id === editBtn.dataset.id);
+        if (supplier) openSupplierEditModal(supplier);
+        return;
+      }
+      const deleteBtn = event.target.closest("button[data-action='delete-supplier']");
+      if (deleteBtn) {
+        deleteSupplier(deleteBtn.dataset.id);
+      }
+    });
+
+    // Expense row click handler (edit, preview, delete)
+    document.getElementById("expenseRows").addEventListener("click", (event) => {
+      const previewBtn = event.target.closest("button[data-action='preview-file']");
+      if (previewBtn) {
+        openPdfViewer(previewBtn.dataset.id, 'expense');
+        return;
+      }
+      const editBtn = event.target.closest("button[data-action='edit-expense']");
+      if (editBtn) {
+        const expense = data.expenses.find((e) => e.id === editBtn.dataset.id);
+        if (expense) openExpenseInForm(expense);
+        return;
+      }
+      const deleteBtn = event.target.closest("button[data-action='delete-expense']");
+      if (deleteBtn) {
+        deleteExpense(deleteBtn.dataset.id);
+      }
+    });
+
+    // Sales/Invoice file preview handler
+    document.getElementById("saleRows").addEventListener("click", (event) => {
+      const previewBtn = event.target.closest("button[data-action='preview-file']");
+      if (previewBtn) {
+        openPdfViewer(previewBtn.dataset.id, 'sale');
+      }
+    });
+
+    // PDF viewer close handlers
+    document.getElementById("pdfViewerClose").addEventListener("click", closePdfViewer);
+    document.getElementById("pdfViewerModal").addEventListener("click", (e) => {
+      if (e.target.id === "pdfViewerModal") closePdfViewer();
+    });
+
+    // Expense form VAT calculation handlers
+    document.getElementById("expenseAmount").addEventListener("input", calculateExpenseVat);
+    document.getElementById("expenseVatRate").addEventListener("change", calculateExpenseVat);
+    document.getElementById("expenseCategory").addEventListener("change", onCategoryChange);
+
+    // VAT Reports handlers
+    document.getElementById("vatLoadBtn").addEventListener("click", () => {
+      loadVatReport();
+      loadYearlyVatReport();
+    });
+    document.getElementById("vatYear").addEventListener("change", loadYearlyVatReport);
+
+    // Handle escape key to close modals
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        closePdfViewer();
+        document.getElementById("saleEditModal").classList.add("hidden");
+        document.getElementById("customerEditModal").classList.add("hidden");
+        document.getElementById("supplierEditModal").classList.add("hidden");
+        document.getElementById("changePasswordModal").classList.add("hidden");
+      }
+    });
+
+    (async function init() {
+      const me = await fetch("/api/auth/me", { credentials: "same-origin" });
+      if (me.status === 401) {
+        window.location.href = "/login";
+        return;
+      }
+      await loadAll();
+      updateSaleTotalsFromLines();
+      calculateExpenseVat();
+      loadDashboard();
+      loadInvoiceConfig();
+      
+      // Restore last active tab from localStorage
+      const savedTab = localStorage.getItem(ACTIVE_TAB_KEY);
+      if (savedTab && document.getElementById("tab-" + savedTab)) {
+        switchTab(savedTab);
+      }
+    })();
+  </script>
+</body>
+</html>

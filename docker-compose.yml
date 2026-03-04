@@ -1,0 +1,57 @@
+name: el-contador
+
+services:
+  postgres:
+    container_name: el-contador-postgres
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${DB_USER:-el_contador}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+      POSTGRES_DB: ${DB_NAME:-el_contador_finance}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    # Expose only if you need to connect from the host (e.g. psql). Backend uses internal network.
+    # ports:
+    #   - "5434:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 3s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    container_name: el-contador-backend
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-el_contador_finance}
+      DB_USER: ${DB_USER:-el_contador}
+      DB_PASSWORD: ${DB_PASSWORD}
+      SESSION_SECRET: ${SESSION_SECRET:?Set SESSION_SECRET in .env}
+      INIT_ADMIN_EMAIL: ${INIT_ADMIN_EMAIL:-admin@example.com}
+      INIT_ADMIN_PASSWORD: ${INIT_ADMIN_PASSWORD:-${DB_PASSWORD}}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.1-flash-lite-preview}
+      PORT: 3080
+    ports:
+      - "${ADMIN_PORT:-3080}:3080"
+    volumes:
+      - server_uploads:/app/uploads
+    develop:
+      watch:
+        - action: sync+restart
+          path: ./server
+          target: /app
+
+# Volume names kept for backward compatibility: same names as before so existing DB and uploads are reused
+volumes:
+  postgres_data:
+    name: ikomex_postgres_data
+  server_uploads:
+    name: ikomex_server_uploads

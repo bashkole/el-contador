@@ -1,0 +1,21 @@
+{
+  "name": "el-contador-server",
+  "version": "1.0.0",
+  "description": "El Contador backend API and auth",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "init-db": "node db/init.js"
+  },
+  "dependencies": {
+    "@google/genai": "^0.10.0",
+    "bcrypt": "^5.1.1",
+    "connect-pg-simple": "^10.0.0",
+    "cookie-parser": "^1.4.6",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.0",
+    "express-session": "^1.18.0",
+    "multer": "^1.4.5-lts.1",
+    "pg": "^8.13.0"
+  }
+}

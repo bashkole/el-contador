@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>El Contador</title>
+  <link rel="icon" href="favicon.png" type="image/png">
+  <style>
+    :root {
+      --bg: #111316;
+      --wave: rgba(176, 178, 192, 0.08);
+      --wave-strong: rgba(176, 178, 192, 0.14);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background-color: var(--bg);
+      font-family: Arial, sans-serif;
+      color: #f7f7f7;
+      position: relative;
+      overflow-x: hidden;
+    }
+
+    .wave-bg {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      mask-image: linear-gradient(to bottom, black 0%, transparent 30%, transparent 70%, black 100%);
+      -webkit-mask-image: linear-gradient(to bottom, black 0%, transparent 30%, transparent 70%, black 100%);
+    }
+
+    .wave-bg svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .layout {
+      position: relative;
+      z-index: 1;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+    }
+
+    .hero {
+      width: min(1000px, 100%);
+      padding: 32px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .hero-logo {
+      display: block;
+      max-width: min(280px, 100%);
+      width: auto;
+      height: auto;
+      object-fit: contain;
+    }
+
+    .company-logos {
+      position: fixed;
+      bottom: 5%;
+      left: 0;
+      right: 0;
+      z-index: 2;
+      pointer-events: none;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 16px;
+      padding: 0 24px;
+    }
+
+    .logo-chip {
+      position: absolute;
+      border: 1px solid rgba(255, 255, 255, 0.13);
+      color: rgba(255, 255, 255, 0.2);
+      background: rgba(255, 255, 255, 0.03);
+      border-radius: 999px;
+      padding: clamp(6px, 1.2vw, 10px) clamp(10px, 2vw, 18px);
+      font-size: clamp(11px, 1.5vw, 14px);
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      backdrop-filter: blur(2px);
+      max-width: 90vw;
+    }
+
+    .logo-link {
+      pointer-events: auto;
+      text-decoration: none;
+      display: block;
+      flex-shrink: 0;
+    }
+
+    .logo-link .brand-logo {
+      filter: grayscale(100%) brightness(0.35);
+      height: 52px;
+      width: auto;
+      object-fit: contain;
+      display: block;
+      border: 1px solid rgba(255, 255, 255, 0.13);
+      background: rgba(255, 255, 255, 0.03);
+      border-radius: 999px;
+      padding: 6px 12px;
+      backdrop-filter: blur(2px);
+    }
+
+    .logo-link:hover .brand-logo {
+      filter: grayscale(100%) brightness(0.5);
+    }
+
+    .logo-static {
+      pointer-events: none;
+      flex-shrink: 0;
+    }
+
+    .logo-static .brand-logo {
+      filter: grayscale(100%) brightness(0.35);
+      height: 52px;
+      width: auto;
+      object-fit: contain;
+      display: block;
+      border: 1px solid rgba(255, 255, 255, 0.13);
+      background: rgba(255, 255, 255, 0.03);
+      border-radius: 999px;
+      padding: 6px 12px;
+      backdrop-filter: blur(2px);
+    }
+  </style>
+</head>
+<body>
+  <div class="company-logos">
+    <a href="https://mexart.nl" target="_blank" rel="noopener noreferrer" class="logo-link">
+      <img src="Mexart.png" alt="Mexart" class="brand-logo">
+    </a>
+    <a href="https://flying-cocktails.com" target="_blank" rel="noopener noreferrer" class="logo-link">
+      <img src="Flyingcocktails.png" alt="Flying Cocktails" class="brand-logo">
+    </a>
+    <a href="https://urban-scout.app" target="_blank" rel="noopener noreferrer" class="logo-link">
+      <img src="Urban.png" alt="Urban Scout" class="brand-logo">
+    </a>
+    <a href="https://zintli.app" target="_blank" rel="noopener noreferrer" class="logo-link">
+      <img src="Zintli.png" alt="Zintli" class="brand-logo">
+    </a>
+    <a href="https://cp3.ai" target="_blank" rel="noopener noreferrer" class="logo-link">
+      <img src="cp3.png" alt="CP3" class="brand-logo">
+    </a>
+    <div class="logo-static">
+      <img src="Chilango.png" alt="Chilango Runner" class="brand-logo">
+    </div>
+  </div>
+
+  <div class="wave-bg" aria-hidden="true">
+    <svg viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="waveGradTop" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="var(--wave-strong)" />
+          <stop offset="100%" stop-color="transparent" />
+        </linearGradient>
+        <linearGradient id="waveGradBottom" x1="100%" y1="100%" x2="0%" y2="0%">
+          <stop offset="0%" stop-color="var(--wave-strong)" />
+          <stop offset="100%" stop-color="transparent" />
+        </linearGradient>
+      </defs>
+      <!-- Top waves: flowing curves from top-left toward top-right -->
+      <path fill="none" stroke="url(#waveGradTop)" stroke-width="0.5" stroke-opacity="0.6" d="M-100,80 Q200,20 500,60 T1100,40" />
+      <path fill="none" stroke="url(#waveGradTop)" stroke-width="0.5" stroke-opacity="0.5" d="M-80,120 Q250,80 520,100 T1120,90" />
+      <path fill="none" stroke="url(#waveGradTop)" stroke-width="0.5" stroke-opacity="0.4" d="M-120,160 Q180,120 480,140 T1080,130" />
+      <path fill="none" stroke="var(--wave)" stroke-width="0.4" stroke-opacity="0.5" d="M-60,200 Q220,160 540,180 T1140,170" />
+      <path fill="none" stroke="var(--wave)" stroke-width="0.4" stroke-opacity="0.35" d="M-100,240 Q200,200 500,220 T1100,210" />
+      <!-- Bottom waves: flowing curves from bottom-right toward bottom-left -->
+      <path fill="none" stroke="url(#waveGradBottom)" stroke-width="0.5" stroke-opacity="0.6" d="M1300,720 Q1000,760 700,720 T100,740" />
+      <path fill="none" stroke="url(#waveGradBottom)" stroke-width="0.5" stroke-opacity="0.5" d="M1280,680 Q1020,640 680,680 T80,660" />
+      <path fill="none" stroke="url(#waveGradBottom)" stroke-width="0.5" stroke-opacity="0.4" d="M1320,640 Q980,600 720,640 T120,600" />
+      <path fill="none" stroke="var(--wave)" stroke-width="0.4" stroke-opacity="0.5" d="M1260,600 Q1040,560 660,600 T60,560" />
+      <path fill="none" stroke="var(--wave)" stroke-width="0.4" stroke-opacity="0.35" d="M1300,560 Q1000,520 700,560 T100,520" />
+    </svg>
+  </div>
+
+  <main class="layout">
+    <section class="hero">
+      <img src="logo.png" alt="El Contador" class="hero-logo" width="280" decoding="async">
+    </section>
+  </main>
+</body>
+</html>

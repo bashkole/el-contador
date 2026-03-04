@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>El Contador Admin</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 560px; margin: 40px auto; padding: 20px; }
+    .msg { padding: 16px; background: #fff7df; border: 1px solid #f0d996; border-radius: 8px; margin-top: 16px; }
+    a { color: #2d66d7; }
+  </style>
+</head>
+<body>
+  <p id="redirect">Redirecting to <a href="/">admin</a>...</p>
+  <div id="setup" class="msg" style="display: none;">
+    <strong>Admin backend is not running or not reachable.</strong><br><br>
+    Log in only works when the Node server is running and this subdomain points to it.
+    See the README in the el-contador package for install and run steps. (PostgreSQL, .env, npm run init-db, npm start, reverse proxy).
+  </div>
+  <script>
+    fetch('/api/auth/me', { credentials: 'same-origin' })
+      .then(function (r) {
+        if (r.status === 401) window.location.href = '/login';
+        else window.location.href = '/';
+      })
+      .catch(function () {
+        document.getElementById('redirect').style.display = 'none';
+        document.getElementById('setup').style.display = 'block';
+      });
+  </script>
+</body>
+</html>

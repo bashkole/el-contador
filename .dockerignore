@@ -1,0 +1,10 @@
+node_modules
+.git
+*.md
+.env
+.env.*
+!.env.example
+server/node_modules
+server/uploads
+_bmad
+.cursor

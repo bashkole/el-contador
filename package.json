@@ -1,0 +1,25 @@
+{
+  "name": "el-contador",
+  "version": "1.0.0",
+  "description": "Bookkeeping and expense management – run with Docker",
+  "keywords": ["bookkeeping", "expenses", "docker", "accounting", "finance"],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-org/el-contador.git"
+  },
+  "files": [
+    "server",
+    "admin",
+    "docker-compose.yml",
+    ".env.example",
+    "README.md",
+    "bin"
+  ],
+  "bin": {
+    "el-contador": "bin/cli.js"
+  },
+  "devDependencies": {
+    "bmad-method": "^6.0.1"
+  }
+}
