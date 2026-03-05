@@ -46,10 +46,19 @@ async function init() {
   const schemaPath = path.join(__dirname, 'schema.sql');
   const schema = fs.readFileSync(schemaPath, 'utf8');
   const statements = splitSqlStatements(schema);
-  for (const stmt of statements) {
+  for (let i = 0; i < statements.length; i++) {
+    const stmt = statements[i];
     const s = stmt.trim();
     if (!s) continue;
-    await pool.query(stmt);
+    // Skip comment-only statements (PostgreSQL would reject them)
+    if (/^\s*--/.test(s) && s.replace(/--[^\n]*/g, '').replace(/\s/g, '').length === 0) continue;
+    try {
+      await pool.query(stmt);
+    } catch (err) {
+      const snippet = s.slice(0, 80).replace(/\s+/g, ' ');
+      console.error(`Schema statement ${i + 1}/${statements.length} failed: ${snippet}...`);
+      throw err;
+    }
   }
   console.log('Schema applied.');
   try {

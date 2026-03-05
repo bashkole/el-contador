@@ -1,6 +1,6 @@
 {
   "name": "el-contador",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "description": "Bookkeeping and expense management – run with Docker",
   "keywords": ["bookkeeping", "expenses", "docker", "accounting", "finance"],
   "license": "MIT",
