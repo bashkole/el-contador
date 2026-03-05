@@ -1941,7 +1941,7 @@
           const bankArrow = bankIsIn ? "&#8593;" : "&#8595;";
           const bankColor = bankIsIn ? "var(--recon-in)" : "var(--recon-out)";
           const bankLabel = bankIsIn ? "Money In" : "Money Out";
-          const actionsCell = tx.reconciled ? "<span class=\"small\" style=\"color: var(--muted);\">Paired</span>" : `<button type="button" data-action="delete-bank" data-id="${tx.id}" class="btn-secondary">Delete</button>`;
+          const actionsCell = tx.reconciled ? "<span class=\"small\" style=\"color: var(--muted);\">Paired</span>" : `<button type="button" class="btn-secondary bank-delete-btn" data-id="${tx.id}">Delete</button>`;
           tr.innerHTML = `
             <td>${tx.date}</td>
             <td><span style="color: ${bankColor}; font-weight: 600;"><span style="font-weight: bold;">${bankArrow}</span> ${bankLabel}</span></td>
@@ -1954,6 +1954,12 @@
             <td>${actionsCell}</td>
           `;
           rows.appendChild(tr);
+          const deleteBtn = tr.querySelector(".bank-delete-btn");
+          if (deleteBtn && deleteBtn.dataset.id) {
+            deleteBtn.addEventListener("click", function () {
+              if (typeof window.openBankDeleteModal === "function") window.openBankDeleteModal(deleteBtn.dataset.id);
+            });
+          }
         });
     }
 
@@ -4671,29 +4677,27 @@
       }
     });
 
-    let pendingBankDeleteId = null;
-    document.addEventListener("click", function bankDeleteClick(event) {
-      const deleteBtn = event.target.closest("button[data-action='delete-bank']");
-      const bankRowsEl = document.getElementById("bankRows");
-      if (!deleteBtn || !deleteBtn.dataset.id || !bankRowsEl || !bankRowsEl.contains(deleteBtn)) return;
-      pendingBankDeleteId = deleteBtn.dataset.id;
-      document.getElementById("bankDeleteModal").classList.remove("hidden");
-    });
+    window.openBankDeleteModal = function (id) {
+      const modal = document.getElementById("bankDeleteModal");
+      if (!modal) return;
+      modal.dataset.pendingId = id;
+      modal.classList.remove("hidden");
+    };
     document.getElementById("bankDeleteCancel").addEventListener("click", () => {
-      pendingBankDeleteId = null;
-      document.getElementById("bankDeleteModal").classList.add("hidden");
+      const modal = document.getElementById("bankDeleteModal");
+      if (modal) { delete modal.dataset.pendingId; modal.classList.add("hidden"); }
     });
     document.getElementById("bankDeleteModal").addEventListener("click", (e) => {
       if (e.target.id === "bankDeleteModal") {
-        pendingBankDeleteId = null;
-        document.getElementById("bankDeleteModal").classList.add("hidden");
+        const modal = document.getElementById("bankDeleteModal");
+        if (modal) { delete modal.dataset.pendingId; modal.classList.add("hidden"); }
       }
     });
     document.getElementById("bankDeleteConfirm").addEventListener("click", async () => {
-      if (!pendingBankDeleteId) return;
-      const id = pendingBankDeleteId;
-      pendingBankDeleteId = null;
-      document.getElementById("bankDeleteModal").classList.add("hidden");
+      const modal = document.getElementById("bankDeleteModal");
+      const id = modal && modal.dataset.pendingId;
+      if (!id) return;
+      if (modal) { delete modal.dataset.pendingId; modal.classList.add("hidden"); }
       try {
         await apiDelete("/api/bank-transactions/" + encodeURIComponent(id));
         data.bankTransactions = await apiGet("/api/bank-transactions");

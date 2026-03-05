@@ -1,6 +1,6 @@
 {
   "name": "el-contador-server",
-  "version": "1.0.9",
+  "version": "1.0.10",
   "description": "El Contador backend API and auth",
   "main": "index.js",
   "scripts": {
