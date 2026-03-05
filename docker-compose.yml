@@ -1,4 +1,5 @@
-name: el-contador
+# Compose file format 3.8 for compatibility with docker-compose (v1) and docker compose (v2)
+version: "3.8"
 
 services:
   postgres:
@@ -43,11 +44,6 @@ services:
       - "${ADMIN_PORT:-3080}:3080"
     volumes:
       - server_uploads:/app/uploads
-    develop:
-      watch:
-        - action: sync+restart
-          path: ./server
-          target: /app
 
 # Volume names kept for backward compatibility: same names as before so existing DB and uploads are reused
 volumes:

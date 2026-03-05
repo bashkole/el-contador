@@ -4672,12 +4672,12 @@
     });
 
     let pendingBankDeleteId = null;
-    document.getElementById("bankRows").addEventListener("click", (event) => {
+    document.addEventListener("click", function bankDeleteClick(event) {
       const deleteBtn = event.target.closest("button[data-action='delete-bank']");
-      if (deleteBtn && deleteBtn.dataset.id) {
-        pendingBankDeleteId = deleteBtn.dataset.id;
-        document.getElementById("bankDeleteModal").classList.remove("hidden");
-      }
+      const bankRowsEl = document.getElementById("bankRows");
+      if (!deleteBtn || !deleteBtn.dataset.id || !bankRowsEl || !bankRowsEl.contains(deleteBtn)) return;
+      pendingBankDeleteId = deleteBtn.dataset.id;
+      document.getElementById("bankDeleteModal").classList.remove("hidden");
     });
     document.getElementById("bankDeleteCancel").addEventListener("click", () => {
       pendingBankDeleteId = null;

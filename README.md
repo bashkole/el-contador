@@ -4,6 +4,8 @@ Bookkeeping and expense management – expenses, sales, bank transactions, and r
 
 ## Install (first time)
 
+To use **from npm**: the package must be published first (`npm publish` from the repo); then `npm install el-contador` works. **Before publishing** or to use the latest from Git: `npm install github:YOUR_ORG/el-contador` (replace with your repo URL).
+
 You do **not** need to install PostgreSQL on the host or create a database/user manually. The first run creates everything from your `.env`: PostgreSQL runs in a container and creates the user and database automatically; the app then applies the schema and creates the admin user.
 
 1. Create a project directory and add the package:

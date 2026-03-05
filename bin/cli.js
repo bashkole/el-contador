@@ -16,26 +16,22 @@ function shQuote(s) {
   return "'" + String(s).replace(/'/g, "'\"'\"'") + "'";
 }
 
-// Run compose via shell so "docker compose" or "docker-compose" is parsed correctly by the OS
+// Run compose: try "docker compose" first (plugin), then "docker-compose" (standalone)
 function runCompose(subargs) {
   const envPart = hasEnv ? ' --env-file ' + shQuote(envFile) : '';
   const base = ' -f ' + shQuote(composePath) + envPart + ' ';
-  const full = base + subargs.join(' ');
-  const r = spawnSync(
-    process.platform === 'win32' ? 'cmd' : 'sh',
-    [process.platform === 'win32' ? '/c' : '-c', 'docker-compose' + full],
-    { stdio: 'inherit', cwd }
-  );
-  if (r.status === 0) return;
-  const r2 = spawnSync(
-    process.platform === 'win32' ? 'cmd' : 'sh',
-    [process.platform === 'win32' ? '/c' : '-c', 'docker compose' + full],
-    { stdio: 'inherit', cwd }
-  );
-  if (r2.status !== 0) {
-    console.error('el-contador: need "docker-compose" or "docker compose". Install Docker and Docker Compose.');
-    process.exit(1);
+  const full = subargs.join(' ');
+  const tryOrder = ['docker compose' + base + full, 'docker-compose' + base + full];
+  for (const cmd of tryOrder) {
+    const r = spawnSync(
+      process.platform === 'win32' ? 'cmd' : 'sh',
+      [process.platform === 'win32' ? '/c' : '-c', cmd],
+      { stdio: 'inherit', cwd }
+    );
+    if (r.status === 0) return;
   }
+  console.error('el-contador: need "docker compose" or "docker-compose". Install Docker and Docker Compose.');
+  process.exit(1);
 }
 
 if (cmd === 'update') {
