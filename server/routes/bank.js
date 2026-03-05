@@ -174,7 +174,7 @@ router.get('/', async (req, res) => {
   let r;
   try {
     r = await pool.query(
-      'SELECT id, date, type, amount, reference, description, reconciled, reconciliation_ref_type, reconciliation_ref_id, reconciled_at, adjustment_amount, created_at FROM bank_transactions ORDER BY date DESC'
+      'SELECT id, date, type, amount, reference, description, reconciled, reconciliation_ref_type, reconciliation_ref_id, reconciled_at, adjustment_amount, account_type, account_note, created_at FROM bank_transactions ORDER BY date DESC'
     );
   } catch (err) {
     if (err.code === '42703') {
@@ -195,6 +195,8 @@ router.get('/', async (req, res) => {
     reconciliationRefId: row.reconciliation_ref_id,
     reconciledAt: row.reconciled_at,
     adjustmentAmount: row.adjustment_amount != null ? Number(row.adjustment_amount) : 0,
+    accountType: row.account_type ?? null,
+    accountNote: row.account_note ?? null,
     createdAt: row.created_at,
   })));
 });
@@ -227,6 +229,23 @@ router.post('/', async (req, res) => {
     reconciledAt: row.reconciled_at,
     createdAt: row.created_at,
   });
+});
+
+/** Delete a bank transaction (e.g. to remove duplicated import). Only allowed for unpaired lines. */
+router.delete('/:id', async (req, res) => {
+  const id = req.params.id;
+  const r = await pool.query(
+    'SELECT id, reconciled FROM bank_transactions WHERE id = $1',
+    [id]
+  );
+  if (r.rows.length === 0) {
+    return res.status(404).json({ error: 'Bank transaction not found' });
+  }
+  if (r.rows[0].reconciled) {
+    return res.status(400).json({ error: 'Cannot delete a paired transaction. Unmatch it first.' });
+  }
+  await pool.query('DELETE FROM bank_transactions WHERE id = $1', [id]);
+  res.json({ ok: true });
 });
 
 module.exports = router;

@@ -109,9 +109,11 @@ CREATE TABLE IF NOT EXISTS bank_transactions (
   reference text,
   description text NOT NULL,
   reconciled boolean NOT NULL DEFAULT false,
-  reconciliation_ref_type text CHECK (reconciliation_ref_type IN ('expense', 'sale', 'expenses')),
+  reconciliation_ref_type text CHECK (reconciliation_ref_type IN ('expense', 'sale', 'expenses', 'account')),
   reconciliation_ref_id uuid,
   reconciled_at timestamptz,
+  account_type text,
+  account_note text,
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
@@ -127,14 +129,14 @@ CREATE INDEX IF NOT EXISTS idx_bank_reconciled ON bank_transactions(reconciled);
 -- Migration: Adjustment amount when reconciliation balance is within 0.50 EUR
 ALTER TABLE bank_transactions ADD COLUMN IF NOT EXISTS adjustment_amount numeric(12,2) DEFAULT 0;
 
--- Migration: Allow reconciliation_ref_type 'expenses' for multi-expense match
+-- Migration: Allow reconciliation_ref_type 'expenses' and 'account' for multi-expense match and ledger
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'bank_transactions_reconciliation_ref_type_check') THEN
     ALTER TABLE bank_transactions DROP CONSTRAINT bank_transactions_reconciliation_ref_type_check;
   END IF;
   ALTER TABLE bank_transactions ADD CONSTRAINT bank_transactions_reconciliation_ref_type_check
-    CHECK (reconciliation_ref_type IN ('expense', 'sale', 'expenses'));
+    CHECK (reconciliation_ref_type IN ('expense', 'sale', 'expenses', 'account'));
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 CREATE INDEX IF NOT EXISTS idx_customers_name ON customers(name);

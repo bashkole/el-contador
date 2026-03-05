@@ -11,21 +11,32 @@ const hasEnv = fs.existsSync(envFile);
 
 const cmd = process.argv[2] || 'start';
 
-// Prefer "docker compose" (plugin); fall back to "docker-compose" (standalone) on older hosts
-function getComposeRunner() {
-  const r = spawnSync('docker', ['compose', 'version'], { encoding: 'utf8' });
-  if (r.status === 0) {
-    return { bin: 'docker', args: (sub) => ['compose', '-f', composePath].concat(hasEnv ? ['--env-file', envFile] : []).concat(sub) };
-  }
-  const r2 = spawnSync('docker-compose', ['--version'], { encoding: 'utf8' });
-  if (r2.status === 0) {
-    return { bin: 'docker-compose', args: (sub) => ['-f', composePath].concat(hasEnv ? ['--env-file', envFile] : []).concat(sub) };
-  }
-  console.error('el-contador: need "docker compose" or "docker-compose". Install Docker and Docker Compose.');
-  process.exit(1);
+// Escape for safe use in a shell command (single-quote style)
+function shQuote(s) {
+  return "'" + String(s).replace(/'/g, "'\"'\"'") + "'";
 }
 
-const runner = getComposeRunner();
+// Run compose via shell so "docker compose" or "docker-compose" is parsed correctly by the OS
+function runCompose(subargs) {
+  const envPart = hasEnv ? ' --env-file ' + shQuote(envFile) : '';
+  const base = ' -f ' + shQuote(composePath) + envPart + ' ';
+  const full = base + subargs.join(' ');
+  const r = spawnSync(
+    process.platform === 'win32' ? 'cmd' : 'sh',
+    [process.platform === 'win32' ? '/c' : '-c', 'docker-compose' + full],
+    { stdio: 'inherit', cwd }
+  );
+  if (r.status === 0) return;
+  const r2 = spawnSync(
+    process.platform === 'win32' ? 'cmd' : 'sh',
+    [process.platform === 'win32' ? '/c' : '-c', 'docker compose' + full],
+    { stdio: 'inherit', cwd }
+  );
+  if (r2.status !== 0) {
+    console.error('el-contador: need "docker-compose" or "docker compose". Install Docker and Docker Compose.');
+    process.exit(1);
+  }
+}
 
 if (cmd === 'update') {
   const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
@@ -40,13 +51,11 @@ if (cmd === 'start' || cmd === 'up' || cmd === 'update') {
     process.exit(1);
   }
   if (!hasEnv) console.warn('el-contador: no .env in current directory; copy from node_modules/el-contador/.env.example');
-  const args = runner.args(['up', '-d']);
-  if (cmd === 'update') args.push('--build');
-  const r = spawnSync(runner.bin, args, { stdio: 'inherit', cwd });
-  process.exit(r.status !== null ? r.status : 1);
+  const subargs = ['up', '-d'];
+  if (cmd === 'update') subargs.push('--build');
+  runCompose(subargs);
 } else if (cmd === 'down' || cmd === 'stop') {
-  const r = spawnSync(runner.bin, runner.args(['down']), { stdio: 'inherit', cwd });
-  process.exit(r.status !== null ? r.status : 1);
+  runCompose(['down']);
 } else {
   console.log('Usage: el-contador [start|up|down|stop|update]');
   console.log('  start, up   Start the app (default). Requires .env in current directory.');

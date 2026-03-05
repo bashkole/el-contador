@@ -106,6 +106,14 @@ Your data (database and uploads) lives in Docker volumes and is not overwritten 
 - `el-contador down` or `el-contador stop` – stop containers.
 - `el-contador update` – run `npm update el-contador` then rebuild and start.
 
+If `npx el-contador` fails (e.g. "unknown shorthand flag: 'f'"), your host may have Docker but not the Compose plugin in the expected form. Install **docker-compose** (standalone) or run Compose manually from the same directory as `.env`:
+
+```bash
+docker-compose -f node_modules/el-contador/docker-compose.yml --env-file .env up -d
+```
+
+On Ubuntu: `sudo apt install docker-compose-plugin` (V2) or the standalone `docker-compose` package.
+
 ## Publishing to npm (maintainers)
 
 1. Create an npm account at [npmjs.com/signup](https://www.npmjs.com/signup) if needed.

@@ -123,7 +123,41 @@ router.post('/match-expenses', async (req, res) => {
   }
 });
 
-/** Unmatch a bank transaction from its expense(s) or sale */
+const ACCOUNT_TYPES = ['loan', 'accrual', 'retro', 'other'];
+
+/** Reconcile a bank transaction to an account (no expense or invoice). For loans, accruals, retros, etc. */
+router.post('/match-account', async (req, res) => {
+  const { bankTransactionId, accountType, accountNote } = req.body || {};
+  if (!bankTransactionId || !accountType || !ACCOUNT_TYPES.includes(accountType)) {
+    return res.status(400).json({
+      error: 'bankTransactionId and accountType required; accountType must be one of: loan, accrual, retro, other',
+    });
+  }
+  const now = new Date().toISOString();
+  try {
+    const txRow = await pool.query(
+      'SELECT id, reconciled FROM bank_transactions WHERE id = $1',
+      [bankTransactionId]
+    );
+    if (txRow.rows.length === 0) {
+      return res.status(404).json({ error: 'Bank transaction not found' });
+    }
+    if (txRow.rows[0].reconciled) {
+      return res.status(400).json({ error: 'Bank transaction is already reconciled' });
+    }
+    const note = accountNote != null ? String(accountNote).trim() : null;
+    await pool.query(
+      `UPDATE bank_transactions SET reconciled = true, reconciliation_ref_type = 'account', reconciliation_ref_id = NULL,
+       reconciled_at = $1, account_type = $2, account_note = $3, adjustment_amount = 0 WHERE id = $4`,
+      [now, accountType, note || null, bankTransactionId]
+    );
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+/** Unmatch a bank transaction from its expense(s), sale, or account */
 router.post('/unmatch', async (req, res) => {
   const { bankTransactionId } = req.body || {};
   if (!bankTransactionId) {
@@ -141,7 +175,7 @@ router.post('/unmatch', async (req, res) => {
     const row = r.rows[0];
     await client.query('BEGIN');
     await client.query(
-      `UPDATE bank_transactions SET reconciled = false, reconciliation_ref_type = NULL, reconciliation_ref_id = NULL, reconciled_at = NULL, adjustment_amount = 0 WHERE id = $1`,
+      `UPDATE bank_transactions SET reconciled = false, reconciliation_ref_type = NULL, reconciliation_ref_id = NULL, reconciled_at = NULL, adjustment_amount = 0, account_type = NULL, account_note = NULL WHERE id = $1`,
       [bankTransactionId]
     );
     if (row.reconciliation_ref_type === 'expense' && row.reconciliation_ref_id) {
