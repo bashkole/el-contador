@@ -64,13 +64,6 @@ CREATE TABLE IF NOT EXISTS expenses (
 -- Migration: Add supplier_id column if table exists without it
 ALTER TABLE expenses ADD COLUMN IF NOT EXISTS supplier_id uuid REFERENCES suppliers(id) ON DELETE SET NULL;
 
--- Migration: Add category_id to suppliers if not present
-ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS category_id uuid REFERENCES expense_categories(id) ON DELETE SET NULL;
-
--- Migration: Link expenses to bank transaction for multi-expense matching
-ALTER TABLE expenses ADD COLUMN IF NOT EXISTS bank_transaction_id uuid REFERENCES bank_transactions(id) ON DELETE SET NULL;
-CREATE INDEX IF NOT EXISTS idx_expenses_bank_transaction ON expenses(bank_transaction_id);
-
 CREATE TABLE IF NOT EXISTS sales (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   invoice_no text UNIQUE NOT NULL,
@@ -142,6 +135,10 @@ END $$;
 CREATE INDEX IF NOT EXISTS idx_customers_name ON customers(name);
 CREATE INDEX IF NOT EXISTS idx_suppliers_name ON suppliers(name);
 
+-- Migration: Link expenses to bank transaction (must run after bank_transactions exists)
+ALTER TABLE expenses ADD COLUMN IF NOT EXISTS bank_transaction_id uuid REFERENCES bank_transactions(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS idx_expenses_bank_transaction ON expenses(bank_transaction_id);
+
 -- Expense categories for proper PnL and chart reporting
 CREATE TABLE IF NOT EXISTS expense_categories (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -153,6 +150,9 @@ CREATE TABLE IF NOT EXISTS expense_categories (
   active boolean NOT NULL DEFAULT true,
   created_at timestamptz NOT NULL DEFAULT now()
 );
+
+-- Migration: Add category_id to suppliers if not present (must run after expense_categories exists)
+ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS category_id uuid REFERENCES expense_categories(id) ON DELETE SET NULL;
 
 -- Migration: Add category_id and vat_rate columns to expenses if they don't exist
 ALTER TABLE expenses ADD COLUMN IF NOT EXISTS category_id uuid REFERENCES expense_categories(id) ON DELETE SET NULL;
