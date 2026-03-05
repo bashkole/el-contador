@@ -47,8 +47,9 @@ if (cmd === 'start' || cmd === 'up' || cmd === 'update') {
     process.exit(1);
   }
   if (!hasEnv) console.warn('el-contador: no .env in current directory; copy from node_modules/el-contador/.env.example');
-  const subargs = ['up', '-d'];
-  if (cmd === 'update') subargs.push('--build');
+  
+  // Always build to ensure we use the latest files from node_modules/el-contador
+  const subargs = ['up', '-d', '--build'];
   runCompose(subargs);
 } else if (cmd === 'down' || cmd === 'stop') {
   runCompose(['down']);

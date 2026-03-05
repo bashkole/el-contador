@@ -2,7 +2,13 @@
   "name": "el-contador",
   "version": "1.0.9",
   "description": "Bookkeeping and expense management – run with Docker",
-  "keywords": ["bookkeeping", "expenses", "docker", "accounting", "finance"],
+  "keywords": [
+    "bookkeeping",
+    "expenses",
+    "docker",
+    "accounting",
+    "finance"
+  ],
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -31,5 +37,11 @@
   },
   "devDependencies": {
     "bmad-method": "^6.0.1"
+  },
+  "dependencies": {
+    "bcrypt": "^6.0.0",
+    "dotenv": "^17.3.1",
+    "el-contador": "^1.0.9",
+    "pg": "^8.20.0"
   }
 }
