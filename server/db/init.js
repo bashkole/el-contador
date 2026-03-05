@@ -3,9 +3,54 @@ const fs = require('fs');
 const path = require('path');
 const { pool } = require('./pool');
 
+/** Split SQL into single statements so tables exist before ALTERs reference them. Respects $$ ... $$ blocks. */
+function splitSqlStatements(sql) {
+  const out = [];
+  let cur = '';
+  let inDollar = false;
+  let i = 0;
+  while (i < sql.length) {
+    if (inDollar) {
+      if (sql.slice(i, i + 2) === '$$') {
+        cur += '$$';
+        i += 2;
+        inDollar = false;
+      } else {
+        cur += sql[i];
+        i++;
+      }
+      continue;
+    }
+    if (sql.slice(i, i + 2) === '$$') {
+      cur += '$$';
+      i += 2;
+      inDollar = true;
+      continue;
+    }
+    if (sql[i] === ';') {
+      const stmt = cur.trim();
+      if (stmt.length > 0) out.push(stmt);
+      cur = '';
+      i++;
+      continue;
+    }
+    cur += sql[i];
+    i++;
+  }
+  const last = cur.trim();
+  if (last.length > 0) out.push(last);
+  return out;
+}
+
 async function init() {
-  const schema = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf8');
-  await pool.query(schema);
+  const schemaPath = path.join(__dirname, 'schema.sql');
+  const schema = fs.readFileSync(schemaPath, 'utf8');
+  const statements = splitSqlStatements(schema);
+  for (const stmt of statements) {
+    const s = stmt.trim();
+    if (!s) continue;
+    await pool.query(stmt);
+  }
   console.log('Schema applied.');
   try {
     await pool.query("ALTER TABLE sales ADD COLUMN IF NOT EXISTS lines jsonb DEFAULT '[]'");
