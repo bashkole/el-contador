@@ -94,13 +94,20 @@ npm update el-contador
 docker compose -f node_modules/el-contador/docker-compose.yml --env-file .env up -d --build
 ```
 
+If `npm update` says "up to date" but a newer version is on npm (`npm view el-contador version`), install the latest explicitly then rebuild:
+
+```bash
+npm install el-contador@latest
+docker compose -f node_modules/el-contador/docker-compose.yml --env-file .env up -d --build
+```
+
 Or use the CLI:
 
 ```bash
 npx el-contador update
 ```
 
-Your data (database and uploads) lives in Docker volumes and is not overwritten by updates.
+After a successful update, the backend log will show `el-contador-server@X.Y.Z` (that version matches the release). Your data (database and uploads) lives in Docker volumes and is not overwritten by updates.
 
 ## Commands (CLI)
 
@@ -123,7 +130,7 @@ On Ubuntu: `sudo apt install docker-compose-plugin` (V2) or the standalone `dock
 3. From this directory (the package root): `npm publish --access public`.  
    `--access public` is required for unscoped packages.
 4. Update `repository.url` in `package.json` to your real Git URL before publishing.
-5. For later releases: bump `version` in `package.json`, then `npm publish` again.
+5. For later releases: bump `version` in both **package.json** (root) and **server/package.json** so the backend log shows the correct release (e.g. `el-contador-server@1.0.7`), then `npm publish` from the package root.
 
 ## License
 
