@@ -32,7 +32,7 @@ Then set in `.env`:
    - `npm run init-db`
 3. Start the server: `npm start` (listens on `PORT`, default 3000).
 
-Point admin.ikomex.nl at this app (reverse proxy to `http://127.0.0.1:3000`). First login with the email/password from step 2.
+Point your subdomain at this app (reverse proxy to `http://127.0.0.1:3080` or your ADMIN_PORT). See the root README for an nginx example. First login with the email/password from step 2.
 
 ## API (all under `/api`, require session except auth)
 

@@ -28,6 +28,7 @@ const DEFAULTS = {
   email: 'accounts@example.com',
   footer: 'Thank you for your business.',
   logoPath: '',
+  geminiModel: 'gemini-2.0-flash',
 };
 
 router.get('/', async (req, res) => {
@@ -36,6 +37,13 @@ router.get('/', async (req, res) => {
   const data = { ...DEFAULTS, ...raw };
   if (!data.footer && (raw.footerLine1 || raw.footerLine2)) {
     data.footer = [raw.footerLine1, raw.footerLine2].filter(Boolean).join('\n');
+  }
+  // Never send the API key to the client; only whether it is set
+  if (data.geminiApiKey) {
+    data.geminiApiKeySet = true;
+    delete data.geminiApiKey;
+  } else {
+    data.geminiApiKeySet = false;
   }
   res.json(data);
 });
@@ -53,12 +61,26 @@ router.put('/', async (req, res) => {
     email: String(body.email ?? existing.email ?? '').trim() || DEFAULTS.email,
     footer: String(body.footer ?? existing.footer ?? '').trim() || DEFAULTS.footer,
     logoPath: existing.logoPath || '',
+    geminiModel: String(body.geminiModel ?? existing.geminiModel ?? '').trim() || DEFAULTS.geminiModel,
   };
+  if (body.hasOwnProperty('geminiApiKey')) {
+    const key = typeof body.geminiApiKey === 'string' ? body.geminiApiKey.trim() : '';
+    data.geminiApiKey = key || null;
+  } else if (existing.geminiApiKey) {
+    data.geminiApiKey = existing.geminiApiKey;
+  }
   await pool.query(
     'INSERT INTO invoice_settings (id, data) VALUES (1, $1::jsonb) ON CONFLICT (id) DO UPDATE SET data = $1::jsonb',
     [JSON.stringify(data)]
   );
-  res.json(data);
+  const out = { ...data };
+  if (out.geminiApiKey) {
+    out.geminiApiKeySet = true;
+    delete out.geminiApiKey;
+  } else {
+    out.geminiApiKeySet = false;
+  }
+  res.json(out);
 });
 
 router.get('/logo', (req, res) => {

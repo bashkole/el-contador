@@ -19,7 +19,8 @@ async function init() {
   const password = process.env.INIT_ADMIN_PASSWORD || process.env.DB_PASSWORD || 'changeme';
   const hash = await bcrypt.hash(password, 10);
   await pool.query(
-    `INSERT INTO users (email, password_hash) VALUES ($1, $2) ON CONFLICT (email) DO UPDATE SET password_hash = $2`,
+    `INSERT INTO users (email, password_hash, role) VALUES ($1, $2, 'admin')
+     ON CONFLICT (email) DO UPDATE SET password_hash = $2, role = 'admin'`,
     [email, hash]
   );
   console.log('Admin user ready:', email);

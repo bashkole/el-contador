@@ -58,14 +58,24 @@ function getCategoryIdOther() {
     .then((r) => (r.rows[0] ? r.rows[0].id : null));
 }
 
-async function processFile(filePath) {
+async function getGeminiOptions() {
+  try {
+    const r = await pool.query('SELECT data FROM invoice_settings WHERE id = 1');
+    const data = r.rows[0]?.data || {};
+    return { apiKey: data.geminiApiKey || null, model: data.geminiModel || null };
+  } catch (_) {
+    return {};
+  }
+}
+
+async function processFile(filePath, geminiOptions = {}) {
   const originalName = path.basename(filePath);
   const ext = path.extname(originalName).toLowerCase();
   if (!ALLOWED_EXT.includes(ext)) return { skipped: true, reason: 'unsupported extension' };
 
   let data = null;
   try {
-    data = await extractInvoiceData(filePath);
+    data = await extractInvoiceData(filePath, geminiOptions);
   } catch (err) {
     console.error(`  Extract failed for ${originalName}:`, err.message);
     data = {
@@ -142,12 +152,13 @@ async function main() {
 
   console.log(`Processing ${files.length} file(s) from ${dir}\n`);
 
+  const geminiOptions = await getGeminiOptions();
   let created = 0;
   let skipped = 0;
   for (const filePath of files) {
     const name = path.basename(filePath);
     try {
-      const result = await processFile(filePath);
+      const result = await processFile(filePath, geminiOptions);
       if (result.created) {
         created++;
         console.log(`[OK] ${name} -> expense ${result.id} (${result.vendor}, ${result.date}, ${result.amount})`);

@@ -1,0 +1,3 @@
+# Dependencies are installed by Docker build (npm ci in server/); do not publish
+node_modules
+**/node_modules

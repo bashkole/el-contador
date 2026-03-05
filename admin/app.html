@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>El Contador – Finance Admin</title>
+  <title>Finance Admin</title>
   <style>
     :root {
       --bg: #f4f7fb;
@@ -158,6 +158,35 @@
       background: #f8fafc;
     }
 
+    .filter-toggles {
+      display: inline-flex;
+      gap: 0;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .filter-toggles .btn-filter {
+      padding: 6px 12px;
+      font-size: 13px;
+      background: #fff;
+      border: none;
+      border-right: 1px solid var(--line);
+      color: var(--muted);
+      cursor: pointer;
+    }
+    .filter-toggles .btn-filter:last-child {
+      border-right: none;
+    }
+    .filter-toggles .btn-filter:hover {
+      background: #f8fafc;
+      color: var(--text);
+    }
+    .filter-toggles .btn-filter.active {
+      background: var(--line);
+      color: var(--text);
+      font-weight: 500;
+    }
+
     table {
       width: 100%;
       border-collapse: collapse;
@@ -250,6 +279,13 @@
         grid-template-columns: 1fr;
       }
     }
+
+    #reconBankRows tr.recon-bank-row { cursor: pointer; }
+    #reconBankRows tr.recon-bank-row:hover { background: var(--bg); }
+    #reconBankRows tr.recon-bank-row.suggested { background: rgba(45, 102, 215, 0.08); }
+    @media (max-width: 800px) {
+      #reconTwoCol { grid-template-columns: 1fr; }
+    }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
@@ -258,14 +294,16 @@
   <div class="app">
     <div class="topbar">
       <div>
-        <h1>El Contador – Finance Admin</h1>
+        <h1 id="mainHeading">Finance Admin</h1>
         <div class="small">Simple internal bookkeeping workspace for expenses, sales, bank transactions, and reconciliation.</div>
       </div>
+      <a href="#" id="topbarAdminLink" class="btn-secondary" style="flex-shrink: 0;">Admin</a>
     </div>
 
     <nav class="tabs">
       <button class="tab-btn active" data-tab="dashboard">Dashboard</button>
       <button class="tab-btn" data-tab="expenses">Expenses</button>
+      <button class="tab-btn" data-tab="tasks">Tasks</button>
       <button class="tab-btn" data-tab="sales">Sales</button>
       <button class="tab-btn" data-tab="bank">Bank Transactions</button>
       <button class="tab-btn" data-tab="reconciliation">Reconciliation</button>
@@ -439,6 +477,7 @@
             <label for="expenseNotes">Notes</label>
             <textarea id="expenseNotes"></textarea>
           </div>
+          <p id="expenseApprovalMessage" class="small" style="display: none; margin-top: 8px; color: var(--muted);"></p>
           <div class="actions">
             <button type="submit" id="expenseSubmitBtn" class="btn-primary">Save Expense</button>
             <button type="button" id="expenseFormEditCancel" class="btn-secondary" style="display: none;">Cancel</button>
@@ -447,9 +486,20 @@
       </div>
       <div class="panel">
         <h2>Expenses List</h2>
-        <div class="field" style="margin-bottom: 12px; max-width: 320px;">
-          <label for="expenseSearch">Search</label>
-          <input id="expenseSearch" type="text" placeholder="Amount, supplier, invoice #, notes...">
+        <div style="display: flex; flex-wrap: wrap; align-items: flex-end; gap: 16px; margin-bottom: 12px;">
+          <div class="field" style="margin-bottom: 0; max-width: 320px;">
+            <label for="expenseSearch">Search</label>
+            <input id="expenseSearch" type="text" placeholder="Amount, supplier, invoice #, notes...">
+          </div>
+          <div class="field" style="margin-bottom: 0;">
+            <label style="display: block; margin-bottom: 4px;">Filter</label>
+            <span id="expenseFilterToggles" class="filter-toggles">
+              <button type="button" data-filter="all" class="btn-filter active">All</button>
+              <button type="button" data-filter="open" class="btn-filter">Open</button>
+              <button type="button" data-filter="paired" class="btn-filter">Paired</button>
+              <button type="button" data-filter="pending_approval" class="btn-filter">Pending approval</button>
+            </span>
+          </div>
         </div>
         <table>
           <thead>
@@ -462,12 +512,61 @@
               <th>VAT</th>
               <th>Total</th>
               <th>File</th>
+              <th>Approval</th>
               <th>Status</th>
               <th>Actions</th>
             </tr>
           </thead>
           <tbody id="expenseRows"></tbody>
         </table>
+      </div>
+    </section>
+
+    <section id="tab-tasks" class="tab-content hidden">
+      <div class="panel">
+        <h2>Pending my approval</h2>
+        <p class="small">Expenses waiting for your approval. Approve or reject each item.</p>
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Vendor</th>
+              <th>Submitter</th>
+              <th>Amount</th>
+              <th>Level</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="taskApprovalRows"></tbody>
+        </table>
+        <p id="taskApprovalEmpty" class="small" style="display: none; color: var(--muted);">No expenses pending your approval.</p>
+      </div>
+      <div class="panel">
+        <h2>My pending submissions</h2>
+        <p class="small">Expenses you submitted that are still waiting for approval.</p>
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Vendor</th>
+              <th>Amount</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="taskMyPendingRows"></tbody>
+        </table>
+        <p id="taskMyPendingEmpty" class="small" style="display: none; color: var(--muted);">No pending submissions.</p>
+      </div>
+      <div id="rejectModal" class="modal-overlay hidden">
+        <div class="panel" style="max-width: 400px; width: 100%; margin: 16px;">
+          <h2>Reject expense</h2>
+          <p class="small">Optional reason (visible to submitter):</p>
+          <textarea id="rejectNote" rows="3" style="width: 100%; margin-bottom: 12px;"></textarea>
+          <div class="actions">
+            <button type="button" id="rejectConfirmBtn" class="btn-danger">Reject</button>
+            <button type="button" id="rejectCancelBtn" class="btn-secondary">Cancel</button>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -579,31 +678,6 @@
             <div class="actions" style="margin-top: 12px;">
               <button type="submit" class="btn-primary">Save</button>
               <button type="button" id="saleEditCancel" class="btn-secondary">Cancel</button>
-            </div>
-          </form>
-        </div>
-      </div>
-
-      <div id="changePasswordModal" class="modal-overlay hidden">
-        <div class="panel" style="max-width: 400px; width: 100%; margin: 16px;">
-          <h2>Change password</h2>
-          <form id="changePasswordForm">
-            <div class="field">
-              <label for="changePasswordCurrent">Current password</label>
-              <input id="changePasswordCurrent" type="password" required autocomplete="current-password">
-            </div>
-            <div class="field">
-              <label for="changePasswordNew">New password</label>
-              <input id="changePasswordNew" type="password" required minlength="8" autocomplete="new-password">
-            </div>
-            <div class="field">
-              <label for="changePasswordConfirm">Confirm new password</label>
-              <input id="changePasswordConfirm" type="password" required minlength="8" autocomplete="new-password">
-            </div>
-            <p id="changePasswordError" class="small" style="color: var(--danger); margin-top: 8px; display: none;"></p>
-            <div class="actions" style="margin-top: 12px;">
-              <button type="submit" class="btn-primary">Update password</button>
-              <button type="button" id="changePasswordCancel" class="btn-secondary">Cancel</button>
             </div>
           </form>
         </div>
@@ -775,6 +849,24 @@
             <label for="cfgFooter">Footer (multi-line)</label>
             <textarea id="cfgFooter" rows="4" placeholder="Thank you for your business.&#10;Payment within 14 days.&#10;EU payments: NL69ABNA0884756785"></textarea>
           </div>
+          <div class="field" style="margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border);">
+            <h3 class="small" style="margin-bottom: 8px;">Receipt / invoice data extraction (Gemini)</h3>
+            <p class="small" style="margin-bottom: 12px;">Used when extracting data from receipt or invoice PDFs/images. Get an API key from <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a>.</p>
+            <div class="grid">
+              <div class="field">
+                <label for="cfgGeminiKey">Gemini API key</label>
+                <input id="cfgGeminiKey" type="password" autocomplete="off" placeholder="Paste your key or leave blank to keep current">
+              </div>
+              <div class="field">
+                <label for="cfgGeminiModel">Model</label>
+                <input id="cfgGeminiModel" type="text" placeholder="gemini-2.0-flash">
+              </div>
+            </div>
+            <label class="small" style="display: flex; align-items: center; gap: 8px; margin-top: 8px;">
+              <input type="checkbox" id="cfgGeminiKeyClear">
+              Clear saved API key
+            </label>
+          </div>
           <div class="actions" style="margin-top: 12px;">
             <button type="submit" class="btn-primary">Save invoice settings</button>
           </div>
@@ -784,12 +876,80 @@
 
     <section id="tab-admin" class="tab-content hidden">
       <div class="panel">
-        <h2>Account &amp; users</h2>
-        <p class="small">Change your password, sign out, or create a new admin user.</p>
+        <h2>Account</h2>
+        <p class="small">Change your password or sign out.</p>
         <div class="actions" style="margin-top: 12px;">
           <button id="btnChangePassword" type="button" class="btn-secondary">Change password</button>
           <button id="btnLogout" type="button">Log out</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Users</h2>
+        <p class="small">Create and manage users. Set role (Admin / User) and hierarchy level for approval flow.</p>
+        <div class="actions" style="margin-top: 12px;">
           <button id="btnCreateUser" type="button" class="btn-primary">Create new user</button>
+        </div>
+        <table style="margin-top: 16px;">
+          <thead>
+            <tr><th>Email</th><th>Role</th><th>Hierarchy</th><th>Created</th><th></th></tr>
+          </thead>
+          <tbody id="adminUsersList"></tbody>
+        </table>
+      </div>
+
+      <div class="panel">
+        <h2>Expense approval</h2>
+        <p class="small">When enabled, expenses submitted by non-admin users require approval. Select up to 5 approvers and their level (0 = Final, 1 = First line, 2 = Second line).</p>
+        <div class="field" style="margin-bottom: 12px;">
+          <label style="display: flex; align-items: center; gap: 8px;">
+            <input type="checkbox" id="approvalEnabled" name="approvalEnabled">
+            Enable expense approval for non-admin users
+          </label>
+        </div>
+        <div id="approvalApproversList"></div>
+        <div class="actions" style="margin-top: 12px;">
+          <button type="button" id="btnAddApprover" class="btn-secondary">Add approver</button>
+          <button type="button" id="btnSaveApprovalSettings" class="btn-primary">Save approval settings</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Expense categories</h2>
+        <p class="small">Categories used for expenses and PnL reporting. Set default VAT rate and account code.</p>
+        <div class="actions" style="margin-top: 12px;">
+          <button id="btnAddCategory" type="button" class="btn-primary">Add category</button>
+        </div>
+        <table style="margin-top: 16px;">
+          <thead>
+            <tr><th>Name</th><th>Description</th><th>VAT %</th><th>Account code</th><th>Order</th><th></th></tr>
+          </thead>
+          <tbody id="adminCategoriesList"></tbody>
+        </table>
+      </div>
+
+      <div id="changePasswordModal" class="modal-overlay hidden">
+        <div class="panel" style="max-width: 400px; width: 100%; margin: 16px;">
+          <h2>Change password</h2>
+          <form id="changePasswordForm">
+            <div class="field">
+              <label for="changePasswordCurrent">Current password</label>
+              <input id="changePasswordCurrent" type="password" required autocomplete="current-password">
+            </div>
+            <div class="field">
+              <label for="changePasswordNew">New password</label>
+              <input id="changePasswordNew" type="password" required minlength="8" autocomplete="new-password">
+            </div>
+            <div class="field">
+              <label for="changePasswordConfirm">Confirm new password</label>
+              <input id="changePasswordConfirm" type="password" required minlength="8" autocomplete="new-password">
+            </div>
+            <p id="changePasswordError" class="small" style="color: var(--danger); margin-top: 8px; display: none;"></p>
+            <div class="actions" style="margin-top: 12px;">
+              <button type="submit" class="btn-primary">Update password</button>
+              <button type="button" id="changePasswordCancel" class="btn-secondary">Cancel</button>
+            </div>
+          </form>
         </div>
       </div>
 
@@ -813,6 +973,67 @@
             <div class="actions" style="margin-top: 12px;">
               <button type="submit" class="btn-primary">Create user</button>
               <button type="button" id="createUserCancel" class="btn-secondary">Cancel</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div id="editUserModal" class="modal-overlay hidden">
+        <div class="panel" style="max-width: 400px; width: 100%; margin: 16px;">
+          <h2>Edit user</h2>
+          <input type="hidden" id="editUserId" value="">
+          <div class="field">
+            <label for="editUserRole">Role</label>
+            <select id="editUserRole">
+              <option value="user">User</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="editUserHierarchy">Hierarchy level (0 = top, no approval needed)</label>
+            <select id="editUserHierarchy">
+              <option value="0">0 - Top (no approval)</option>
+              <option value="1">1 - One level</option>
+              <option value="2">2 - Two levels</option>
+            </select>
+          </div>
+          <p id="editUserError" class="small" style="color: var(--danger); margin-top: 8px; display: none;"></p>
+          <div class="actions" style="margin-top: 12px;">
+            <button type="button" id="editUserSave" class="btn-primary">Save</button>
+            <button type="button" id="editUserCancel" class="btn-secondary">Cancel</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="categoryModal" class="modal-overlay hidden">
+        <div class="panel" style="max-width: 440px; width: 100%; margin: 16px;">
+          <h2 id="categoryModalTitle">Add category</h2>
+          <form id="categoryForm">
+            <input type="hidden" id="categoryId" value="">
+            <div class="field">
+              <label for="categoryName">Name *</label>
+              <input id="categoryName" type="text" required placeholder="e.g. Office supplies">
+            </div>
+            <div class="field">
+              <label for="categoryDescription">Description</label>
+              <input id="categoryDescription" type="text" placeholder="Optional">
+            </div>
+            <div class="field">
+              <label for="categoryDefaultVatRate">Default VAT %</label>
+              <input id="categoryDefaultVatRate" type="number" step="0.01" min="0" max="100" value="21" placeholder="21">
+            </div>
+            <div class="field">
+              <label for="categoryAccountCode">Account code</label>
+              <input id="categoryAccountCode" type="text" placeholder="e.g. 6100">
+            </div>
+            <div class="field">
+              <label for="categorySortOrder">Sort order</label>
+              <input id="categorySortOrder" type="number" min="0" value="0" placeholder="0">
+            </div>
+            <p id="categoryError" class="small" style="color: var(--danger); margin-top: 8px; display: none;"></p>
+            <div class="actions" style="margin-top: 12px;">
+              <button type="submit" class="btn-primary">Save</button>
+              <button type="button" id="categoryCancel" class="btn-secondary">Cancel</button>
             </div>
           </form>
         </div>
@@ -855,12 +1076,32 @@
       </div>
       <div class="panel">
         <h2>Import from CSV</h2>
-        <p class="small">Upload a CSV with columns: date, type, amount, description, reference (or same order without header). Date: YYYY-MM-DD or DD/MM/YYYY. Type: in/out or credit/debit.</p>
+        <p class="small">Upload a CSV with columns: date, type, amount, description, reference (or same order without header). Date: YYYY-MM-DD or DD/MM/YYYY. Type: in/out or credit/debit. You will review the parsed data before confirming the import.</p>
         <div class="actions">
           <input type="file" id="bankCsvFile" accept=".csv,text/csv,text/plain">
-          <button type="button" id="bankCsvImport" class="btn-primary">Import CSV</button>
+          <button type="button" id="bankCsvImport" class="btn-primary">Upload and preview</button>
         </div>
         <p id="bankCsvResult" class="small" style="margin-top:8px;"></p>
+      </div>
+      <div id="bankImportPreviewPanel" class="panel hidden">
+        <h2>Confirm import</h2>
+        <p class="small">Review the parsed transactions below. Edit if needed, then confirm to import or cancel to discard.</p>
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Type</th>
+              <th>Description</th>
+              <th>Reference</th>
+              <th style="text-align: right;">Amount (EUR)</th>
+            </tr>
+          </thead>
+          <tbody id="bankImportPreviewRows"></tbody>
+        </table>
+        <div class="actions" style="margin-top: 12px;">
+          <button type="button" id="bankImportConfirm" class="btn-primary">Confirm import</button>
+          <button type="button" id="bankImportCancel">Cancel</button>
+        </div>
       </div>
       <div class="panel">
         <h2>Bank Transactions</h2>
@@ -893,22 +1134,77 @@
         </div>
       </div>
       <div id="reconOpenPanel" class="panel">
-        <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 12px;">
-          <button type="button" id="reconMatchSelected" class="btn-primary" disabled>Match selected</button>
-          <span id="reconSelectionStatus" class="small" style="color: var(--muted);">Select one bank transaction and one or more expenses (Money Out) or one invoice (Money In). Difference must be within 0.50 EUR; any small difference is recorded as an adjustment.</span>
+        <div id="reconSelectionOverview" class="hidden" style="margin-bottom: 20px; padding: 16px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px;">
+          <h3 style="margin: 0 0 12px 0;">Selection overview</h3>
+          <p class="small" style="color: var(--muted); margin: 0 0 12px 0;">Selected items from both columns. Match or create an adjustment as needed.</p>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 12px;">
+            <div>
+              <div class="small" style="font-weight: 600; margin-bottom: 6px;">Bank transaction</div>
+              <div id="reconOverviewBank" class="small" style="min-height: 48px; padding: 8px; background: var(--page-bg); border-radius: 6px;">No bank transaction selected.</div>
+            </div>
+            <div>
+              <div class="small" style="font-weight: 600; margin-bottom: 6px;">Expenses / Invoice</div>
+              <div id="reconOverviewItems" class="small" style="min-height: 48px; padding: 8px; background: var(--page-bg); border-radius: 6px;">No expenses or invoice selected.</div>
+            </div>
+          </div>
+          <div id="reconOverviewTotals" class="small" style="margin-bottom: 12px; padding: 8px; background: var(--page-bg); border-radius: 6px;"></div>
+          <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 12px;">
+            <button type="button" id="reconMatchSelected" class="btn-primary" disabled>Match selected</button>
+            <button type="button" id="reconCreateAdjustment" class="btn-secondary hidden" title="Create expense to balance">+ Add expense to balance</button>
+            <span id="reconSelectionStatus" class="small" style="color: var(--muted);"></span>
+          </div>
         </div>
-        <table>
-          <thead>
-            <tr>
-              <th style="width: 40px;"></th>
-              <th>Type</th>
-              <th>Date</th>
-              <th>Description / Vendor / Customer</th>
-              <th style="text-align: right;">Amount (EUR)</th>
-            </tr>
-          </thead>
-          <tbody id="reconRows"></tbody>
-        </table>
+        <div id="reconTwoCol" style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start;">
+          <div>
+            <h3 style="margin: 0 0 8px 0;">Bank transactions</h3>
+            <p class="small" style="color: var(--muted); margin: 0 0 8px 0;">Select a transaction to see suggested matches.</p>
+            <input type="text" id="reconBankSearch" placeholder="Search bank transactions..." class="field" style="width: 100%; margin-bottom: 8px; padding: 8px;">
+            <div style="border: 1px solid var(--line); border-radius: 8px; overflow: hidden;">
+              <table>
+                <thead>
+                  <tr>
+                    <th style="width: 32px;"></th>
+                    <th>Date</th>
+                    <th>Type</th>
+                    <th>Description</th>
+                    <th style="text-align: right;">Amount</th>
+                  </tr>
+                </thead>
+                <tbody id="reconBankRows"></tbody>
+              </table>
+            </div>
+          </div>
+          <div>
+            <h3 style="margin: 0 0 8px 0;">Expenses &amp; Invoices</h3>
+            <p id="reconRightHint" class="small" style="color: var(--muted); margin: 0 0 8px 0;">Select a bank transaction first, or select an expense/invoice to see suggested bank matches.</p>
+            <input type="text" id="reconExpenseSearch" placeholder="Search expenses / invoices..." class="field" style="width: 100%; margin-bottom: 8px; padding: 8px;">
+            <div id="reconSuggestedBlock" class="hidden" style="margin-bottom: 12px; padding: 10px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px;">
+              <div class="small" style="font-weight: 600; margin-bottom: 6px;">Suggested match</div>
+              <div id="reconSuggestedList"></div>
+              <button type="button" id="reconUseSuggested" class="btn-ok" style="margin-top: 8px;">Use suggested</button>
+              <button type="button" id="reconChooseOther" class="btn-secondary" style="margin-top: 8px; margin-left: 6px;">Choose other...</button>
+            </div>
+            <div id="reconCreateExpenseBlock" class="hidden" style="margin-bottom: 12px; padding: 10px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px;">
+              <div class="small" style="font-weight: 600; margin-bottom: 6px;">No attachment? Create expense from this transaction</div>
+              <p class="small" style="color: var(--muted); margin: 0 0 8px 0;">Uses the selected bank transaction date, amount, reference and description (as supplier). You can edit before saving.</p>
+              <button type="button" id="reconOpenNewExpenseModal" class="btn-secondary">+ Create new expense from transaction</button>
+            </div>
+            <div style="border: 1px solid var(--line); border-radius: 8px; overflow: hidden;">
+              <table>
+                <thead>
+                  <tr>
+                    <th style="width: 32px;"></th>
+                    <th>Date</th>
+                    <th>Type</th>
+                    <th>Vendor / Customer</th>
+                    <th style="text-align: right;">Amount</th>
+                  </tr>
+                </thead>
+                <tbody id="reconExpenseRows"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
       </div>
       <div id="reconPairedPanel" class="panel hidden">
         <table>
@@ -1159,10 +1455,58 @@
         </div>
       </div>
     </div>
+
+    <div id="reconNewExpenseModal" class="modal-overlay hidden">
+      <div class="panel" style="max-width: 480px; width: 100%; margin: 16px;">
+        <h2 style="margin: 0 0 12px 0;">New expense from bank transaction</h2>
+        <p class="small" style="color: var(--muted); margin: 0 0 12px 0;">Pre-filled from the selected transaction. Edit and save to create the expense, then match on this screen.</p>
+        <form id="reconNewExpenseForm">
+          <div class="grid">
+            <div class="field">
+              <label for="reconExpenseDate">Date *</label>
+              <input id="reconExpenseDate" type="date" required>
+            </div>
+            <div class="field">
+              <label for="reconExpenseVendor">Vendor / Supplier *</label>
+              <input id="reconExpenseVendor" type="text" required placeholder="Supplier or payee name">
+            </div>
+            <div class="field">
+              <label for="reconExpenseAmount">Amount (EUR) *</label>
+              <input id="reconExpenseAmount" type="number" step="0.01" required>
+            </div>
+            <div class="field">
+              <label for="reconExpenseVat">VAT (EUR)</label>
+              <input id="reconExpenseVat" type="number" step="0.01" value="0">
+            </div>
+          </div>
+          <div class="field" style="margin-top: 12px;">
+            <label for="reconExpenseReference">Reference</label>
+            <input id="reconExpenseReference" type="text" placeholder="Bank reference">
+          </div>
+          <div class="field" style="margin-top: 12px;">
+            <label for="reconExpenseCategory">Category</label>
+            <select id="reconExpenseCategory">
+              <option value="">-- Select category --</option>
+            </select>
+          </div>
+          <div class="field" style="margin-top: 12px;">
+            <label for="reconExpenseNotes">Notes</label>
+            <textarea id="reconExpenseNotes" rows="2" placeholder="Optional notes"></textarea>
+          </div>
+          <div id="reconNewExpenseError" class="small" style="color: var(--danger); margin-top: 8px; display: none;"></div>
+          <div class="actions" style="margin-top: 12px;">
+            <button type="submit" class="btn-primary">Create expense and select for matching</button>
+            <button type="button" id="reconNewExpenseCancel" class="btn-secondary">Cancel</button>
+          </div>
+        </form>
+      </div>
+    </div>
   </div>
 
   <script>
-    const data = { expenses: [], sales: [], bankTransactions: [], customers: [], suppliers: [], expenseCategories: [] };
+    const data = { expenses: [], sales: [], bankTransactions: [], customers: [], suppliers: [], expenseCategories: [], taskExpenses: [], myPendingExpenses: [] };
+    let currentUser = { userId: null, role: 'user', hierarchyLevel: 1 };
+    let approvalSettings = { enabled: false, approvers: [] };
     let invoiceConfig = {
       companyName: 'El Contador',
       tagline: 'Finance Administration',
@@ -1179,6 +1523,7 @@
     let vatYearlyChartInstance = null;
     let dashboardPeriod = 'month';
     let expenseSearchTerm = '';
+    let expenseFilter = 'all'; // 'all' | 'open' | 'paired'
 
     async function apiGet(path) {
       const r = await fetch(path, { credentials: "same-origin" });
@@ -1251,6 +1596,12 @@
       return "EUR " + Number(n || 0).toFixed(2);
     }
 
+    function escapeHtml(s) {
+      if (s == null) return "";
+      const t = String(s);
+      return t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    }
+
     function daysBetween(dateA, dateB) {
       const a = new Date(dateA);
       const b = new Date(dateB);
@@ -1272,6 +1623,14 @@
         return '<span class="status-pill status-voided">Voided</span>';
       }
       return '<span class="status-pill status-open">Open</span>';
+    }
+
+    function approvalStatusPill(approvalStatus) {
+      if (!approvalStatus || approvalStatus === 'none') return '<span class="small" style="color: var(--muted);">-</span>';
+      if (approvalStatus === 'pending') return '<span class="status-pill status-open">Pending</span>';
+      if (approvalStatus === 'approved') return '<span class="status-pill status-done">Approved</span>';
+      if (approvalStatus === 'rejected') return '<span class="status-pill status-voided">Rejected</span>';
+      return '<span class="small">' + escapeHtml(approvalStatus) + '</span>';
     }
 
     function renderExpenses() {
@@ -1297,6 +1656,7 @@
           const statusHtml = item.reconciled ? statusPill('paid') : `<button data-action="edit-expense" data-id="${item.id}" class="btn-ok">Edit</button>`;
 
           const invoiceNum = item.invoiceNumber ?? item.invoice_number ?? "-";
+          const approvalHtml = approvalStatusPill(item.approvalStatus);
           tr.innerHTML = `
             <td>${item.date}</td>
             <td>${item.vendor}</td>
@@ -1306,6 +1666,7 @@
             <td>${money(item.vat)}</td>
             <td>${money(totalAmount)}</td>
             <td>${fileCell}</td>
+            <td>${approvalHtml}</td>
             <td>${statusHtml}</td>
             <td>
               <button data-action="delete-expense" data-id="${item.id}" class="btn-danger" style="padding: 4px 8px; font-size: 12px;">Delete</button>
@@ -1313,6 +1674,75 @@
           `;
           rows.appendChild(tr);
         });
+    }
+
+    async function loadTasks() {
+      try {
+        const [tasks, allExpenses] = await Promise.all([
+          apiGet("/api/expenses/tasks"),
+          apiGet("/api/expenses"),
+        ]);
+        data.taskExpenses = Array.isArray(tasks) ? tasks : [];
+        data.myPendingExpenses = (Array.isArray(allExpenses) ? allExpenses : []).filter(
+          (e) => e.createdBy === currentUser.userId && (e.approvalStatus || e.approval_status) === "pending"
+        );
+        renderTasks();
+      } catch (err) {
+        console.error("loadTasks", err);
+        data.taskExpenses = [];
+        data.myPendingExpenses = [];
+        renderTasks();
+      }
+    }
+
+    function renderTasks() {
+      const approvalRows = document.getElementById("taskApprovalRows");
+      const approvalEmpty = document.getElementById("taskApprovalEmpty");
+      const myRows = document.getElementById("taskMyPendingRows");
+      const myEmpty = document.getElementById("taskMyPendingEmpty");
+      if (!approvalRows) return;
+      approvalRows.innerHTML = "";
+      if (data.taskExpenses.length === 0) {
+        if (approvalEmpty) approvalEmpty.style.display = "block";
+      } else {
+        if (approvalEmpty) approvalEmpty.style.display = "none";
+        data.taskExpenses.forEach((item) => {
+          const tr = document.createElement("tr");
+          const totalAmount = (Number(item.amount) || 0) + (Number(item.vat) || 0);
+          const levelLabel = item.approverLevel === 0 ? "Final" : item.approverLevel === 1 ? "First line" : "Level " + item.approverLevel;
+          tr.innerHTML = `
+            <td>${item.date}</td>
+            <td>${escapeHtml(item.vendor)}</td>
+            <td>${escapeHtml(item.creatorEmail || "-")}</td>
+            <td>${money(totalAmount)}</td>
+            <td>${escapeHtml(levelLabel)}</td>
+            <td>
+              <button type="button" data-action="approve-expense" data-id="${item.id}" class="btn-ok" style="padding: 4px 8px; font-size: 12px;">Approve</button>
+              <button type="button" data-action="reject-expense" data-id="${item.id}" class="btn-danger" style="padding: 4px 8px; font-size: 12px; margin-left: 4px;">Reject</button>
+            </td>
+          `;
+          approvalRows.appendChild(tr);
+        });
+      }
+      if (myRows) {
+        myRows.innerHTML = "";
+        if (data.myPendingExpenses.length === 0) {
+          if (myEmpty) myEmpty.style.display = "block";
+        } else {
+          if (myEmpty) myEmpty.style.display = "none";
+          data.myPendingExpenses.forEach((item) => {
+            const tr = document.createElement("tr");
+            const totalAmount = (Number(item.amount) || 0) + (Number(item.vat) || 0);
+            tr.innerHTML = `
+              <td>${item.date}</td>
+              <td>${escapeHtml(item.vendor)}</td>
+              <td>${money(totalAmount)}</td>
+              <td>${approvalStatusPill(item.approvalStatus || item.approval_status)}</td>
+            `;
+            myRows.appendChild(tr);
+          });
+        }
+      }
     }
 
     function renderSales() {
@@ -1417,23 +1847,52 @@
         });
     }
 
+    function roundAmount(x) {
+      return Math.round(Number(x) * 100) / 100;
+    }
+
+    function amountsMatchForSuggestion(a, b) {
+      const ra = roundAmount(a);
+      const rb = roundAmount(b);
+      return ra === rb || Math.abs(ra - rb) < 0.005;
+    }
+
     function getSuggestions(tx) {
+      const bankAmount = roundAmount(tx.amount);
       const candidates = tx.type === "out" ? data.expenses : data.sales.filter((s) => !s.voided);
       return candidates
         .filter((item) => !item.reconciled)
         .map((item) => {
           const itemDate = tx.type === "out" ? item.date : item.issueDate;
-          // Bank "out" is gross (amount + vat); sales have total; expenses have amount + vat
           const itemAmount = tx.type === "out"
-            ? (Number(item.amount) || 0) + (Number(item.vat) || 0)
-            : Number(item.amount || item.total);
-          const amountDiff = Math.abs(itemAmount - Number(tx.amount));
+            ? roundAmount((Number(item.amount) || 0) + (Number(item.vat) || 0))
+            : roundAmount(item.total != null ? item.total : item.amount);
+          const amountDiff = Math.abs(itemAmount - bankAmount);
           const dateDiff = daysBetween(itemDate, tx.date);
-          return { item, amountDiff, dateDiff };
+          return { item, itemAmount, amountDiff, dateDiff };
         })
-        .filter((x) => x.amountDiff <= 0.01 && x.dateDiff <= 45)
-        .sort((a, b) => a.dateDiff - b.dateDiff)
-        .slice(0, 3);
+        .filter((x) => (amountsMatchForSuggestion(x.itemAmount, bankAmount) || x.amountDiff <= 0.50) && x.dateDiff <= 90)
+        .sort((a, b) => (a.amountDiff - b.amountDiff) || (a.dateDiff - b.dateDiff))
+        .slice(0, 5);
+    }
+
+    function getSuggestionsForTarget(item) {
+      const isExpense = item.type === "expense";
+      const itemAmount = isExpense
+        ? roundAmount((Number(item.amount) || 0) + (Number(item.vat) || 0))
+        : roundAmount(item.total != null ? item.total : item.amount);
+      const itemDate = isExpense ? item.date : item.issueDate;
+      const bankType = isExpense ? "out" : "in";
+      const openBank = data.bankTransactions.filter((tx) => !tx.reconciled && tx.type === bankType);
+      return openBank
+        .map((tx) => {
+          const amountDiff = Math.abs(roundAmount(tx.amount) - itemAmount);
+          const dateDiff = daysBetween(tx.date, itemDate);
+          return { tx, amountDiff, dateDiff };
+        })
+        .filter((x) => (amountsMatchForSuggestion(x.tx.amount, itemAmount) || x.amountDiff <= 0.50) && x.dateDiff <= 90)
+        .sort((a, b) => (a.amountDiff - b.amountDiff) || (a.dateDiff - b.dateDiff))
+        .slice(0, 5);
     }
 
     async function reconcile(txId, targetId, targetType) {
@@ -1485,71 +1944,244 @@
     }
 
     let reconciliationView = 'open'; // 'open' or 'paired'
+    let reconSelectedBankId = null;
+    let reconSuggestedPreSelect = null; // { type: 'expense'|'sale', id } to pre-check when "Use suggested" was clicked
 
     function renderReconciliation() {
       const openPanel = document.getElementById("reconOpenPanel");
       const pairedPanel = document.getElementById("reconPairedPanel");
-      const openRows = document.getElementById("reconRows");
+      const bankRows = document.getElementById("reconBankRows");
+      const expenseRows = document.getElementById("reconExpenseRows");
       const pairedRows = document.getElementById("reconPairedRows");
 
       if (reconciliationView === 'open') {
         if (openPanel) openPanel.classList.remove("hidden");
         if (pairedPanel) pairedPanel.classList.add("hidden");
-        if (!openRows) return;
+        if (!bankRows || !expenseRows) return;
 
-        openRows.innerHTML = "";
         const openBank = data.bankTransactions.filter((tx) => !tx.reconciled);
         const openExpenses = data.expenses.filter((e) => !e.reconciled);
         const openSales = data.sales.filter((s) => !s.voided && !s.reconciled);
 
-        const items = [
-          ...openBank.map((tx) => ({
-            type: "bank",
-            id: tx.id,
-            date: tx.date,
-            desc: tx.description,
-            amount: Number(tx.amount),
-            inOut: tx.type,
-          })),
-          ...openExpenses.map((e) => ({
-            type: "expense",
-            id: e.id,
-            date: e.date,
-            desc: e.vendor,
-            amount: (Number(e.amount) || 0) + (Number(e.vat) || 0),
-            inOut: "out",
-          })),
-          ...openSales.map((s) => ({
-            type: "sale",
-            id: s.id,
-            date: s.issueDate,
-            desc: s.invoiceNo || s.customer,
-            amount: Number(s.total),
-            inOut: "in",
-          })),
-        ].sort((a, b) => new Date(b.date) - new Date(a.date));
+        const bankSearch = (document.getElementById("reconBankSearch") || {}).value || "";
+        const expenseSearch = (document.getElementById("reconExpenseSearch") || {}).value || "";
+        const bankSearchLower = bankSearch.toLowerCase().trim();
+        const expenseSearchLower = expenseSearch.toLowerCase().trim();
 
-        if (items.length === 0) {
-          const tr = document.createElement("tr");
-          tr.innerHTML = `<td colspan="5" class="small" style="color: var(--muted);">No open items. All bank transactions, expenses and invoices are reconciled.</td>`;
-          openRows.appendChild(tr);
-        } else {
-          items.forEach((item) => {
-            const tr = document.createElement("tr");
-            const isIn = item.inOut === "in";
-            const arrow = isIn ? "&#8593;" : "&#8595;";
-            const color = isIn ? "var(--recon-in)" : "var(--recon-out)";
-            const typeLabel = item.type === "bank" ? (isIn ? "Bank (in)" : "Bank (out)") : item.type === "expense" ? "Expense" : "Invoice";
-            tr.innerHTML = `
-              <td><input type="checkbox" class="recon-open-cb" data-item-type="${item.type}" data-item-id="${item.id}" data-amount="${item.amount}" data-in-out="${item.inOut}"></td>
-              <td><span class="small" style="color: ${color}; font-weight: 600;"><span style="font-weight: bold;">${arrow}</span> ${typeLabel}</span></td>
-              <td>${item.date}</td>
-              <td>${(item.desc || "").slice(0, 60)}${(item.desc || "").length > 60 ? "..." : ""}</td>
-              <td style="text-align: right;">${money(item.amount)}</td>
-            `;
-            openRows.appendChild(tr);
-          });
+        let filteredBank = bankSearchLower
+          ? openBank.filter((tx) => (tx.description || "").toLowerCase().includes(bankSearchLower) || (tx.reference || "").toLowerCase().includes(bankSearchLower))
+          : openBank;
+        if (reconSelectedBankId && !filteredBank.some((tx) => tx.id === reconSelectedBankId)) {
+          const selectedTx = openBank.find((tx) => tx.id === reconSelectedBankId);
+          if (selectedTx) filteredBank = [selectedTx, ...filteredBank];
         }
+        const sortedBank = filteredBank.slice().sort((a, b) => new Date(b.date) - new Date(a.date));
+
+        bankRows.innerHTML = "";
+        let suggestedBankIds = [];
+        const checkedRight = document.querySelectorAll("#reconExpenseRows .recon-expense-cb:checked");
+        if (checkedRight.length === 1) {
+          const cb = checkedRight[0];
+          const itemType = cb.dataset.itemType;
+          const itemId = cb.dataset.itemId;
+          const item = itemType === "expense" ? data.expenses.find((e) => e.id === itemId) : data.sales.find((s) => s.id === itemId);
+          if (item) {
+            const sug = getSuggestionsForTarget(item);
+            suggestedBankIds = sug.map((x) => x.tx.id);
+          }
+        }
+        sortedBank.forEach((tx) => {
+          const tr = document.createElement("tr");
+          const isIn = tx.type === "in";
+          const arrow = isIn ? "&#8593;" : "&#8595;";
+          const color = isIn ? "var(--recon-in)" : "var(--recon-out)";
+          const label = isIn ? "Money In" : "Money Out";
+          const selected = tx.id === reconSelectedBankId ? " selected" : "";
+          const suggested = suggestedBankIds.indexOf(tx.id) !== -1 ? " suggested" : "";
+          tr.className = "recon-bank-row" + selected + suggested;
+          tr.dataset.txId = tx.id;
+          tr.innerHTML = `
+            <td><span class="recon-bank-select" style="display:inline-block;width:18px;height:18px;border:2px solid var(--line);border-radius:50%;${tx.id === reconSelectedBankId ? "background:var(--accent);border-color:var(--accent);" : ""}"></span></td>
+            <td>${tx.date}</td>
+            <td><span style="color:${color};font-weight:600;">${arrow} ${label}</span>${suggested ? " <span class=\"small\" style=\"color:var(--muted);\">(suggested)</span>" : ""}</td>
+            <td>${escapeHtml((tx.description || "").slice(0, 50))}${(tx.description || "").length > 50 ? "..." : ""}</td>
+            <td style="text-align:right;"><strong>${money(tx.amount)}</strong></td>
+          `;
+          bankRows.appendChild(tr);
+        });
+        if (sortedBank.length === 0) {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `<td colspan="5" class="small" style="color:var(--muted);">No open bank transactions.</td>`;
+          bankRows.appendChild(tr);
+        }
+
+        const selectedTx = reconSelectedBankId ? data.bankTransactions.find((t) => t.id === reconSelectedBankId) : null;
+        const suggestions = selectedTx ? getSuggestions(selectedTx) : [];
+        const suggestedBlock = document.getElementById("reconSuggestedBlock");
+        const suggestedList = document.getElementById("reconSuggestedList");
+        if (suggestedBlock && suggestedList) {
+          if (selectedTx && suggestions.length > 0) {
+            suggestedBlock.classList.remove("hidden");
+            const first = suggestions[0];
+            const item = first.item;
+            const type = selectedTx.type === "out" ? "expense" : "sale";
+            const desc = type === "expense" ? item.vendor : (item.invoiceNo || item.customer);
+            const amt = type === "expense" ? (Number(item.amount) || 0) + (Number(item.vat) || 0) : Number(item.total);
+            suggestedList.innerHTML = `<div class="small">${type === "expense" ? "Expense" : "Invoice"}: ${escapeHtml(desc || "")} – <strong>${money(amt)}</strong> (${item.date || item.issueDate})</div>`;
+            suggestedBlock.dataset.suggestedType = type;
+            suggestedBlock.dataset.suggestedId = item.id;
+          } else {
+            suggestedBlock.classList.add("hidden");
+            suggestedBlock.removeAttribute("data-suggested-type");
+            suggestedBlock.removeAttribute("data-suggested-id");
+          }
+        }
+        const createExpenseBlock = document.getElementById("reconCreateExpenseBlock");
+        if (createExpenseBlock) {
+          if (selectedTx && selectedTx.type === "out") {
+            createExpenseBlock.classList.remove("hidden");
+          } else {
+            createExpenseBlock.classList.add("hidden");
+          }
+        }
+
+        const isOut = selectedTx && selectedTx.type === "out";
+        const rightItems = isOut === true
+          ? openExpenses.map((e) => ({ type: "expense", id: e.id, date: e.date, desc: e.vendor, amount: (Number(e.amount) || 0) + (Number(e.vat) || 0) }))
+          : isOut === false
+            ? openSales.map((s) => ({ type: "sale", id: s.id, date: s.issueDate, desc: s.invoiceNo || s.customer, amount: Number(s.total) }))
+            : [...openExpenses.map((e) => ({ type: "expense", id: e.id, date: e.date, desc: e.vendor, amount: (Number(e.amount) || 0) + (Number(e.vat) || 0) })), ...openSales.map((s) => ({ type: "sale", id: s.id, date: s.issueDate, desc: s.invoiceNo || s.customer, amount: Number(s.total) }))];
+        const previouslyChecked = new Set();
+        document.querySelectorAll("#reconExpenseRows .recon-expense-cb:checked").forEach((cb) => {
+          previouslyChecked.add(cb.dataset.itemType + ":" + cb.dataset.itemId);
+        });
+        let filteredRight = expenseSearchLower
+          ? rightItems.filter((r) => (r.desc || "").toLowerCase().includes(expenseSearchLower))
+          : rightItems;
+        previouslyChecked.forEach((key) => {
+          const colon = key.indexOf(":");
+          const type = colon >= 0 ? key.slice(0, colon) : "";
+          const id = colon >= 0 ? key.slice(colon + 1) : "";
+          if (!type || !id) return;
+          const item = rightItems.find((r) => r.type === type && r.id === id);
+          if (item && !filteredRight.some((r) => r.type === type && r.id === id)) {
+            filteredRight = [item, ...filteredRight];
+          }
+        });
+        const sortedRight = filteredRight.slice().sort((a, b) => new Date(b.date) - new Date(a.date));
+        expenseRows.innerHTML = "";
+        sortedRight.forEach((item) => {
+          const tr = document.createElement("tr");
+          const typeLabel = item.type === "expense" ? "Expense" : "Invoice";
+          const color = item.type === "sale" ? "var(--recon-in)" : "var(--recon-out)";
+          const preCheckSuggested = reconSuggestedPreSelect && reconSuggestedPreSelect.type === item.type && reconSuggestedPreSelect.id === item.id;
+          if (preCheckSuggested) reconSuggestedPreSelect = null;
+          const preCheckPreserved = previouslyChecked.has(item.type + ":" + item.id);
+          const preCheck = preCheckSuggested || preCheckPreserved;
+          const cbName = item.type === "sale" ? "reconSaleRadio" : "";
+          tr.innerHTML = `
+            <td><input type="checkbox" class="recon-expense-cb ${item.type === "sale" ? "recon-sale-cb" : ""}" data-item-type="${item.type}" data-item-id="${item.id}" data-amount="${item.amount}" data-in-out="${item.type === "sale" ? "in" : "out"}" ${preCheck ? "checked" : ""} name="${cbName}"></td>
+            <td>${item.date}</td>
+            <td><span style="color:${color};font-weight:600;">${typeLabel}</span></td>
+            <td>${escapeHtml((item.desc || "").slice(0, 50))}${(item.desc || "").length > 50 ? "..." : ""}</td>
+            <td style="text-align:right;"><strong>${money(item.amount)}</strong></td>
+          `;
+          expenseRows.appendChild(tr);
+        });
+        if (sortedRight.length === 0) {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `<td colspan="5" class="small" style="color:var(--muted);">${selectedTx ? (isOut ? "No open expenses." : "No open invoices.") : "Select a bank transaction to see expenses (Money Out) or invoices (Money In)."}</td>`;
+          expenseRows.appendChild(tr);
+        }
+
+        const hint = document.getElementById("reconRightHint");
+        if (hint) hint.textContent = selectedTx ? (isOut ? "Select one or more expenses to match with the bank transaction." : "Select one invoice to match.") : "Select a bank transaction first, or select an expense/invoice to see suggested bank matches.";
+
+        const overviewPanel = document.getElementById("reconSelectionOverview");
+        const overviewBank = document.getElementById("reconOverviewBank");
+        const overviewItems = document.getElementById("reconOverviewItems");
+        const overviewTotals = document.getElementById("reconOverviewTotals");
+        const adjBtn = document.getElementById("reconCreateAdjustment");
+        const { bankTxId, expenseIds, saleId, bankAmount } = getReconSelection();
+        const hasSelection = bankTxId || expenseIds.length > 0 || saleId;
+        if (overviewPanel) {
+          if (hasSelection) {
+            overviewPanel.classList.remove("hidden");
+            if (overviewBank) {
+              if (selectedTx) {
+                const inOut = selectedTx.type === "in" ? "Money In" : "Money Out";
+                const color = selectedTx.type === "in" ? "var(--recon-in)" : "var(--recon-out)";
+                overviewBank.innerHTML = `<span style="color:${color};font-weight:600;">${inOut}</span> ${selectedTx.date} &ndash; <strong>${money(selectedTx.amount)}</strong><br><span style="color:var(--muted);">${escapeHtml((selectedTx.description || "").slice(0, 60))}${(selectedTx.description || "").length > 60 ? "..." : ""}</span>`;
+              } else {
+                overviewBank.textContent = "No bank transaction selected.";
+              }
+            }
+            if (overviewItems) {
+              const parts = [];
+              expenseIds.forEach((id) => {
+                const e = data.expenses.find((x) => x.id === id);
+                if (e) parts.push(`Expense: ${escapeHtml(e.vendor || "")} &ndash; <strong>${money((Number(e.amount) || 0) + (Number(e.vat) || 0))}</strong>`);
+              });
+              if (saleId) {
+                const s = data.sales.find((x) => x.id === saleId);
+                if (s) parts.push(`Invoice: ${escapeHtml(s.invoiceNo || s.customer || "")} &ndash; <strong>${money(Number(s.total))}</strong>`);
+              }
+              overviewItems.innerHTML = parts.length ? parts.join("<br>") : "No expenses or invoice selected.";
+            }
+            if (overviewTotals) {
+              let totalText = "";
+              if (selectedTx && (expenseIds.length > 0 || saleId)) {
+                const bankSum = Number(bankAmount) || 0;
+                let itemsSum = 0;
+                if (isOut) {
+                  expenseIds.forEach((id) => {
+                    const e = data.expenses.find((x) => x.id === id);
+                    if (e) itemsSum += (Number(e.amount) || 0) + (Number(e.vat) || 0);
+                  });
+                } else if (saleId) {
+                  const s = data.sales.find((x) => x.id === saleId);
+                  if (s) itemsSum = Number(s.total) || 0;
+                }
+                const diff = bankSum - itemsSum;
+                totalText = `Bank: <strong>${money(bankSum)}</strong> &nbsp;|&nbsp; Items total: <strong>${money(itemsSum)}</strong> &nbsp;|&nbsp; Difference: <strong>${money(diff)}</strong>`;
+                if (Math.abs(diff) >= 0.01 && Math.abs(diff) <= 0.5) {
+                  totalText += " &nbsp;(will be recorded as adjustment)";
+                }
+              }
+              overviewTotals.innerHTML = totalText || "Select both a bank transaction and expense(s) or invoice to see totals.";
+            }
+            if (adjBtn) {
+              const tx = bankTxId ? data.bankTransactions.find((t) => t.id === bankTxId) : null;
+              let showAdj = false;
+              let adjAmount = 0;
+              if (tx && tx.type === "out") {
+                const bankSum = Number(tx.amount) || 0;
+                let itemsSum = 0;
+                expenseIds.forEach((id) => {
+                  const e = data.expenses.find((x) => x.id === id);
+                  if (e) itemsSum += (Number(e.amount) || 0) + (Number(e.vat) || 0);
+                });
+                const diff = bankSum - itemsSum;
+                if (diff >= 0.01) {
+                  showAdj = true;
+                  adjAmount = diff;
+                }
+              }
+              if (showAdj) {
+                adjBtn.classList.remove("hidden");
+                adjBtn.innerHTML = "+ Add expense to balance (" + money(adjAmount) + ")";
+                adjBtn.dataset.adjustmentAmount = String(adjAmount);
+              } else {
+                adjBtn.classList.add("hidden");
+                adjBtn.removeAttribute("data-adjustment-amount");
+              }
+            }
+          } else {
+            overviewPanel.classList.add("hidden");
+            if (adjBtn) adjBtn.classList.add("hidden");
+          }
+        }
+
         updateReconMatchButton();
       } else {
         if (openPanel) openPanel.classList.add("hidden");
@@ -1633,22 +2265,19 @@
     }
 
     function getReconSelection() {
-      const checkboxes = document.querySelectorAll("#reconRows .recon-open-cb:checked");
-      const bankChecked = [];
+      const bankRow = document.querySelector("#reconBankRows tr.recon-bank-row.selected");
+      const bankTxId = bankRow ? bankRow.dataset.txId : null;
+      const tx = bankTxId ? data.bankTransactions.find((t) => t.id === bankTxId) : null;
+      const bankAmount = tx ? Number(tx.amount) : null;
       const expenseIds = [];
-      const saleChecked = [];
-      checkboxes.forEach((cb) => {
+      let saleId = null;
+      document.querySelectorAll("#reconExpenseRows .recon-expense-cb:checked").forEach((cb) => {
         const type = cb.dataset.itemType;
         const id = cb.dataset.itemId;
-        const amount = Number(cb.dataset.amount) || 0;
-        if (type === "bank") bankChecked.push({ id, amount });
-        else if (type === "expense") expenseIds.push(id);
-        else if (type === "sale") saleChecked.push(id);
+        if (type === "expense") expenseIds.push(id);
+        else if (type === "sale") saleId = id;
       });
-      const bankTxId = bankChecked.length === 1 ? bankChecked[0].id : null;
-      const bankAmount = bankChecked.length === 1 ? bankChecked[0].amount : null;
-      const saleId = saleChecked.length === 1 ? saleChecked[0] : null;
-      return { bankTxId, expenseIds, saleId, bankAmount, bankCount: bankChecked.length, saleCount: saleChecked.length };
+      return { bankTxId, expenseIds, saleId, bankAmount, bankCount: bankTxId ? 1 : 0, saleCount: saleId ? 1 : 0 };
     }
 
     function updateReconMatchButton() {
@@ -1658,6 +2287,7 @@
       const { bankTxId, expenseIds, saleId, bankAmount, bankCount, saleCount } = getReconSelection();
       const tx = bankTxId ? data.bankTransactions.find((t) => t.id === bankTxId) : null;
       const isOut = tx && tx.type === "out";
+      const hasRightSide = isOut ? expenseIds.length > 0 : !!saleId;
 
       if (bankCount > 1) {
         btn.disabled = true;
@@ -1666,7 +2296,12 @@
       }
       if (!bankTxId) {
         btn.disabled = true;
-        status.textContent = "Select one bank transaction and one or more expenses (Money Out) or one invoice (Money In). Sum must equal the transaction amount.";
+        status.textContent = "Select one bank transaction and one or more expenses (Money Out) or one invoice (Money In).";
+        return;
+      }
+      if (!hasRightSide) {
+        btn.disabled = true;
+        status.textContent = isOut ? "Select at least one expense to match with this bank transaction." : "Select one invoice to match with this bank transaction.";
         return;
       }
       if (!isOut && saleCount > 1) {
@@ -1678,72 +2313,82 @@
         const expenses = expenseIds.map((id) => data.expenses.find((e) => e.id === id)).filter(Boolean);
         const sum = expenses.reduce((s, e) => s + (Number(e.amount) || 0) + (Number(e.vat) || 0), 0);
         const diff = (bankAmount || 0) - sum;
-        const match = expenseIds.length > 0 && Math.abs(diff) <= 0.5;
-        btn.disabled = expenseIds.length === 0 || !match;
-        if (expenseIds.length === 0) {
-          status.textContent = "For Money Out: select one or more expenses. Difference vs bank must be within 0.50 EUR.";
-        } else if (Math.abs(diff) > 0.5) {
-          status.textContent = `Expenses total: ${money(sum)}. Bank: ${money(bankAmount || 0)}. Difference ${money(Math.abs(diff))} exceeds 0.50 EUR.`;
+        const match = Math.abs(diff) <= 0.5;
+        btn.disabled = !match;
+        if (Math.abs(diff) > 0.5) {
+          status.textContent = "Totals do not match. Expenses total: " + money(sum) + ", bank: " + money(bankAmount || 0) + ". Use the + button to add an expense to balance, or adjust selection.";
         } else if (Math.abs(diff) <= 0.01) {
-          status.textContent = `Expenses total: ${money(sum)}. Bank: ${money(bankAmount || 0)}. Match.`;
+          status.textContent = "Expenses total: " + money(sum) + ", bank: " + money(bankAmount || 0) + ". Match.";
         } else {
-          status.textContent = `Expenses total: ${money(sum)}. Bank: ${money(bankAmount || 0)}. Difference: ${money(diff)} EUR will be recorded as adjustment.`;
+          status.textContent = "Expenses total: " + money(sum) + ", bank: " + money(bankAmount || 0) + ". Difference " + money(diff) + " will be recorded as adjustment.";
         }
       } else {
         const sale = saleId ? data.sales.find((s) => s.id === saleId) : null;
         const saleTotal = sale ? Number(sale.total) : 0;
         const diff = (bankAmount || 0) - saleTotal;
-        const match = saleId && Math.abs(diff) <= 0.5;
-        btn.disabled = !saleId || !match;
-        if (!saleId) {
-          status.textContent = "For Money In: select one invoice. Difference vs bank must be within 0.50 EUR.";
-        } else if (Math.abs(diff) > 0.5) {
-          status.textContent = `Invoice total: ${money(saleTotal)}. Bank: ${money(bankAmount || 0)}. Difference ${money(Math.abs(diff))} exceeds 0.50 EUR.`;
+        const match = Math.abs(diff) <= 0.5;
+        btn.disabled = !match;
+        if (Math.abs(diff) > 0.5) {
+          status.textContent = "Totals do not match. Invoice: " + money(saleTotal) + ", bank: " + money(bankAmount || 0) + ". Select a different invoice or adjust.";
         } else if (Math.abs(diff) <= 0.01) {
-          status.textContent = `Invoice total: ${money(saleTotal)}. Bank: ${money(bankAmount || 0)}. Match.`;
+          status.textContent = "Invoice: " + money(saleTotal) + ", bank: " + money(bankAmount || 0) + ". Match.";
         } else {
-          status.textContent = `Invoice total: ${money(saleTotal)}. Bank: ${money(bankAmount || 0)}. Difference: ${money(diff)} EUR will be recorded as adjustment.`;
+          status.textContent = "Invoice: " + money(saleTotal) + ", bank: " + money(bankAmount || 0) + ". Difference " + money(diff) + " will be recorded as adjustment.";
         }
       }
     }
 
     async function performReconMatchSelected() {
-      const { bankTxId, expenseIds, saleId } = getReconSelection();
-      const tx = bankTxId ? data.bankTransactions.find((t) => t.id === bankTxId) : null;
-      if (!tx || !bankTxId) {
-        alert("Select one bank transaction.");
-        return;
-      }
-      if (tx.type === "out") {
-        if (expenseIds.length === 0) {
-          alert("Select at least one expense for this outgoing transaction.");
+      const btn = document.getElementById("reconMatchSelected");
+      if (btn) btn.disabled = true;
+      try {
+        const { bankTxId, expenseIds, saleId } = getReconSelection();
+        const tx = bankTxId ? data.bankTransactions.find((t) => t.id === bankTxId) : null;
+        if (!tx || !bankTxId) {
+          alert("Select one bank transaction.");
           return;
         }
-        const expenses = expenseIds.map((id) => data.expenses.find((e) => e.id === id)).filter(Boolean);
-        const sum = expenses.reduce((s, e) => s + (Number(e.amount) || 0) + (Number(e.vat) || 0), 0);
-        if (Math.abs((Number(tx.amount) || 0) - sum) > 0.5) {
-          alert("Difference between expenses total and bank transaction must be within 0.50 EUR.");
-          return;
-        }
-        if (expenseIds.length === 1) {
-          await apiPost("/api/reconciliation/match", { bankTransactionId: bankTxId, targetId: expenseIds[0], targetType: "expense" });
+        if (tx.type === "out") {
+          if (expenseIds.length === 0) {
+            alert("Select at least one expense for this outgoing transaction.");
+            return;
+          }
+          const expenses = expenseIds.map((id) => data.expenses.find((e) => e.id === id)).filter(Boolean);
+          const sum = expenses.reduce((s, e) => s + (Number(e.amount) || 0) + (Number(e.vat) || 0), 0);
+          if (Math.abs((Number(tx.amount) || 0) - sum) > 0.5) {
+            alert("Difference between expenses total and bank transaction must be within 0.50 EUR.");
+            return;
+          }
+          if (expenseIds.length === 1) {
+            await apiPost("/api/reconciliation/match", { bankTransactionId: bankTxId, targetId: expenseIds[0], targetType: "expense" });
+          } else {
+            await apiPost("/api/reconciliation/match-expenses", { bankTransactionId: bankTxId, expenseIds });
+          }
         } else {
-          await apiPost("/api/reconciliation/match-expenses", { bankTransactionId: bankTxId, expenseIds });
+          if (!saleId) {
+            alert("Select one invoice for this incoming transaction.");
+            return;
+          }
+          const sale = data.sales.find((s) => s.id === saleId);
+          if (sale && Math.abs(Number(sale.total) - Number(tx.amount)) > 0.5) {
+            alert("Difference between invoice total and bank transaction must be within 0.50 EUR.");
+            return;
+          }
+          await apiPost("/api/reconciliation/match", { bankTransactionId: bankTxId, targetId: saleId, targetType: "sale" });
         }
-      } else {
-        if (!saleId) {
-          alert("Select one invoice for this incoming transaction.");
-          return;
-        }
-        const sale = data.sales.find((s) => s.id === saleId);
-        if (sale && Math.abs(Number(sale.total) - Number(tx.amount)) > 0.5) {
-          alert("Difference between invoice total and bank transaction must be within 0.50 EUR.");
-          return;
-        }
-        await apiPost("/api/reconciliation/match", { bankTransactionId: bankTxId, targetId: saleId, targetType: "sale" });
+        reconSelectedBankId = null;
+        await loadAll();
+        renderReconciliation();
+      } catch (e) {
+        let msg = e.message || "Match failed.";
+        try {
+          const j = JSON.parse(e.message);
+          if (j.error) msg = j.error;
+        } catch (_) {}
+        alert(msg);
+      } finally {
+        updateReconMatchButton();
       }
-      await loadAll();
-      renderReconciliation();
     }
 
     function renderCustomers() {
@@ -1879,6 +2524,119 @@
       }
     }
 
+    let adminUsers = [];
+    let adminCategories = [];
+
+    async function loadAdminData() {
+      try {
+        const [usersRes, categoriesRes, approvalRes] = await Promise.all([
+          fetch("/api/auth/users", { credentials: "same-origin" }),
+          apiGet("/api/expense-categories"),
+          apiGet("/api/approval-settings").catch(() => null),
+        ]);
+        if (usersRes.ok) adminUsers = await usersRes.json();
+        else adminUsers = [];
+        adminCategories = Array.isArray(categoriesRes) ? categoriesRes : [];
+        data.expenseCategories = adminCategories;
+        if (approvalRes) {
+          approvalSettings.enabled = !!approvalRes.enabled;
+          approvalSettings.approvers = Array.isArray(approvalRes.approvers) ? approvalRes.approvers.slice(0, 5) : [];
+        }
+        renderAdminUsers();
+        renderAdminCategories();
+        renderApprovalSettings();
+        updateExpenseCategorySelect();
+        updateSupplierCategorySelects();
+      } catch (err) {
+        console.error("loadAdminData", err);
+        adminUsers = [];
+        adminCategories = [];
+        renderAdminUsers();
+        renderAdminCategories();
+        renderApprovalSettings();
+      }
+    }
+
+    function renderApprovalSettings() {
+      const container = document.getElementById("approvalApproversList");
+      const enabledEl = document.getElementById("approvalEnabled");
+      if (enabledEl) enabledEl.checked = approvalSettings.enabled;
+      if (!container) return;
+      const approvers = approvalSettings.approvers || [];
+      container.innerHTML = "";
+      approvers.forEach((a, i) => {
+        const div = document.createElement("div");
+        div.className = "field";
+        div.style.display = "flex";
+        div.style.gap = "8px";
+        div.style.alignItems = "center";
+        div.style.marginBottom = "8px";
+        const selectUser = document.createElement("select");
+        selectUser.name = "approverUserId";
+        selectUser.innerHTML = '<option value="">-- Select user --</option>' +
+          adminUsers.map((u) => `<option value="${escapeHtml(u.id)}" ${u.id === (a.userId || a.user_id) ? "selected" : ""}>${escapeHtml(u.email)}</option>`).join("");
+        const selectLevel = document.createElement("select");
+        selectLevel.name = "approverLevel";
+        selectLevel.innerHTML = '<option value="0"' + ((a.level === 0) ? " selected" : "") + '>Final (0)</option><option value="1"' + ((a.level === 1) ? " selected" : "") + '>First line (1)</option><option value="2"' + ((a.level === 2) ? " selected" : "") + '>Second line (2)</option>';
+        const removeBtn = document.createElement("button");
+        removeBtn.type = "button";
+        removeBtn.className = "btn-secondary";
+        removeBtn.textContent = "Remove";
+        removeBtn.onclick = () => {
+          approvalSettings.approvers.splice(i, 1);
+          renderApprovalSettings();
+        };
+        div.appendChild(selectUser);
+        div.appendChild(selectLevel);
+        div.appendChild(removeBtn);
+        container.appendChild(div);
+      });
+    }
+
+    function renderAdminUsers() {
+      const tbody = document.getElementById("adminUsersList");
+      if (!tbody) return;
+      tbody.innerHTML = adminUsers.map((u) => {
+        const created = u.createdAt ? new Date(u.createdAt).toLocaleDateString() : "-";
+        const role = u.role || "user";
+        const level = u.hierarchyLevel != null ? u.hierarchyLevel : 1;
+        const levelLabel = level === 0 ? "Top (no approval)" : level === 1 ? "1 level" : level + " levels";
+        return `<tr>
+          <td>${escapeHtml(u.email)}</td>
+          <td>${escapeHtml(role)}</td>
+          <td>${escapeHtml(levelLabel)}</td>
+          <td>${escapeHtml(created)}</td>
+          <td>
+            <button type="button" class="btn-secondary" data-action="edit-user" data-user-id="${escapeHtml(u.id)}" data-role="${escapeHtml(role)}" data-level="${level}">Edit</button>
+            <button type="button" class="btn-secondary" data-action="delete-user" data-user-id="${escapeHtml(u.id)}">Delete</button>
+          </td>
+        </tr>`;
+      }).join("");
+      if (adminUsers.length === 0) tbody.innerHTML = "<tr><td colspan=\"5\" class=\"small\">No users yet.</td></tr>";
+    }
+
+    function renderAdminCategories() {
+      const tbody = document.getElementById("adminCategoriesList");
+      if (!tbody) return;
+      tbody.innerHTML = adminCategories.map((c) => {
+        const vat = c.defaultVatRate != null ? c.defaultVatRate : "";
+        const code = c.accountCode || "";
+        const order = c.sortOrder != null ? c.sortOrder : "";
+        return `<tr>
+          <td>${escapeHtml(c.name)}</td>
+          <td>${escapeHtml((c.description || "").slice(0, 40))}${(c.description || "").length > 40 ? "..." : ""}</td>
+          <td>${escapeHtml(String(vat))}</td>
+          <td>${escapeHtml(code)}</td>
+          <td>${escapeHtml(String(order))}</td>
+          <td>
+            <button type="button" class="btn-secondary" data-action="edit-category" data-category-id="${escapeHtml(c.id)}">Edit</button>
+            <button type="button" class="btn-secondary" data-action="delete-category" data-category-id="${escapeHtml(c.id)}">Delete</button>
+          </td>
+        </tr>`;
+      }).join("");
+      if (adminCategories.length === 0) tbody.innerHTML = "<tr><td colspan=\"6\" class=\"small\">No categories yet.</td></tr>";
+    }
+
     function updateSupplierCategorySelects() {
       if (!data.expenseCategories || !Array.isArray(data.expenseCategories)) return;
       const options = data.expenseCategories
@@ -1950,6 +2708,19 @@
       if (tabName === "dashboard") loadDashboard();
       if (tabName === "settings") loadInvoiceConfig();
       if (tabName === "suppliers") updateSupplierCategorySelects();
+      if (tabName === "admin") loadAdminData();
+      if (tabName === "tasks") loadTasks();
+      if (tabName === "expenses") {
+        const msgEl = document.getElementById("expenseApprovalMessage");
+        if (msgEl) {
+          if (approvalSettings.enabled && currentUser.role !== "admin" && currentUser.hierarchyLevel > 0) {
+            msgEl.textContent = "This expense will be submitted for approval and will appear in Tasks until all approvers have acted.";
+            msgEl.style.display = "block";
+          } else {
+            msgEl.style.display = "none";
+          }
+        }
+      }
       // Save active tab to localStorage
       localStorage.setItem(ACTIVE_TAB_KEY, tabName);
     }
@@ -2114,8 +2885,13 @@
       renderAll();
     }
 
-    async function loadExpenses(searchTerm) {
-      const url = searchTerm ? "/api/expenses?search=" + encodeURIComponent(searchTerm) : "/api/expenses";
+    async function loadExpenses(searchTerm, filter) {
+      const term = searchTerm !== undefined ? searchTerm : expenseSearchTerm;
+      const pairing = filter !== undefined ? filter : expenseFilter;
+      const q = new URLSearchParams();
+      if (term) q.set("search", term);
+      if (pairing && pairing !== "all") q.set("filter", pairing);
+      const url = "/api/expenses" + (q.toString() ? "?" + q.toString() : "");
       data.expenses = await apiGet(url);
       renderExpenses();
     }
@@ -2218,7 +2994,7 @@
           const idx = data.expenses.findIndex((e) => e.id === editId);
           if (idx >= 0) data.expenses[idx] = updated;
           clearExpenseEditMode();
-          await loadExpenses(expenseSearchTerm);
+          await loadExpenses();
           renderAll();
         } catch (e) {
           let msg = e.message || "Failed to update expense.";
@@ -2268,7 +3044,7 @@
         alert(created.warning.message);
       }
       clearExpenseEditMode();
-      await loadExpenses(expenseSearchTerm);
+      await loadExpenses();
       renderAll();
     }
 
@@ -2727,6 +3503,14 @@
       renderAll();
     }
 
+    function updateAppTitle() {
+      const name = (invoiceConfig && invoiceConfig.companyName) ? invoiceConfig.companyName.trim() : "";
+      const title = name ? name + " – Finance Admin" : "Finance Admin";
+      document.title = title;
+      const h1 = document.getElementById("mainHeading");
+      if (h1) h1.textContent = title;
+    }
+
     async function loadInvoiceConfig() {
       try {
         const c = await apiGet("/api/invoice-config");
@@ -2738,6 +3522,14 @@
         document.getElementById("cfgCompanyNumber").value = c.companyNumber || "";
         document.getElementById("cfgAddress").value = c.address || "";
         document.getElementById("cfgFooter").value = c.footer != null ? c.footer : (c.footerLine1 ? c.footerLine1 + (c.footerLine2 ? "\n" + c.footerLine2 : "") : "");
+        document.getElementById("cfgGeminiKey").value = "";
+        document.getElementById("cfgGeminiKey").placeholder = c.geminiApiKeySet ? "Leave blank to keep current" : "Paste your Gemini API key";
+        document.getElementById("cfgGeminiModel").value = c.geminiModel || "";
+        const clearKeyEl = document.getElementById("cfgGeminiKeyClear");
+        if (clearKeyEl) {
+          clearKeyEl.checked = false;
+          clearKeyEl.closest("label").style.display = c.geminiApiKeySet ? "flex" : "none";
+        }
         const logoImg = document.getElementById("invoiceLogoImg");
         const logoNone = document.getElementById("invoiceLogoNone");
         if (c.logoPath) {
@@ -2749,6 +3541,7 @@
           logoImg.style.display = "none";
           logoNone.style.display = "";
         }
+        updateAppTitle();
       } catch (e) {
         console.warn("Invoice config load failed", e);
       }
@@ -3105,9 +3898,18 @@
         companyNumber: document.getElementById("cfgCompanyNumber").value.trim(),
         address: document.getElementById("cfgAddress").value.trim(),
         footer: document.getElementById("cfgFooter").value.trim(),
+        geminiModel: document.getElementById("cfgGeminiModel").value.trim(),
       };
+      const keyInput = document.getElementById("cfgGeminiKey");
+      const clearKey = document.getElementById("cfgGeminiKeyClear");
+      if (clearKey && clearKey.checked) {
+        c.geminiApiKey = "";
+      } else if (keyInput && keyInput.value.trim()) {
+        c.geminiApiKey = keyInput.value.trim();
+      }
       const updated = await apiPut("/api/invoice-config", c);
       invoiceConfig = { ...updated, logoPath: invoiceConfig.logoPath || updated.logoPath || "" };
+      updateAppTitle();
     }
 
     async function uploadLogo() {
@@ -3335,6 +4137,10 @@
     document.querySelectorAll(".tab-btn[data-tab]").forEach((btn) => {
       btn.addEventListener("click", () => switchTab(btn.dataset.tab));
     });
+    document.getElementById("topbarAdminLink").addEventListener("click", (e) => {
+      e.preventDefault();
+      switchTab("admin");
+    });
     document.querySelectorAll(".dashboard-period").forEach((btn) => {
       btn.addEventListener("click", () => {
         dashboardPeriod = btn.dataset.period || "month";
@@ -3363,16 +4169,29 @@
         const term = this.value.trim();
         expenseSearchTimeout = setTimeout(async () => {
           expenseSearchTerm = term;
-          await loadExpenses(expenseSearchTerm);
+          await loadExpenses();
         }, 280);
       });
     })();
+    document.getElementById("expenseFilterToggles").addEventListener("click", async function (e) {
+      const btn = e.target.closest(".btn-filter");
+      if (!btn) return;
+      const filter = btn.getAttribute("data-filter") || "all";
+      expenseFilter = filter;
+      document.querySelectorAll("#expenseFilterToggles .btn-filter").forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      await loadExpenses();
+    });
     document.getElementById("invoiceSettingsForm").addEventListener("submit", saveInvoiceConfig);
     document.getElementById("cfgLogoUpload").addEventListener("click", uploadLogo);
+    let bankImportPendingRows = [];
     document.getElementById("bankCsvImport").addEventListener("click", async function () {
       const input = document.getElementById("bankCsvFile");
       const resultEl = document.getElementById("bankCsvResult");
+      const previewPanel = document.getElementById("bankImportPreviewPanel");
+      const previewBody = document.getElementById("bankImportPreviewRows");
       resultEl.textContent = "";
+      previewPanel.classList.add("hidden");
       const file = input.files[0];
       if (!file) {
         resultEl.textContent = "Select a CSV file first.";
@@ -3381,9 +4200,65 @@
       const formData = new FormData();
       formData.append("file", file);
       try {
-        const r = await apiPostForm("/api/bank-transactions/import", formData);
+        const r = await apiPostForm("/api/bank-transactions/import/preview", formData);
+        const rows = r.preview || [];
+        if (rows.length === 0) {
+          resultEl.textContent = "No rows to import.";
+          return;
+        }
+        bankImportPendingRows = rows;
+        previewBody.innerHTML = rows.map((row, i) =>
+          "<tr data-index=\"" + i + "\">" +
+          "<td><input type=\"date\" value=\"" + (row.date || "") + "\" data-field=\"date\"></td>" +
+          "<td><select data-field=\"type\"><option value=\"in\"" + (row.type === "in" ? " selected" : "") + ">In</option><option value=\"out\"" + (row.type === "out" ? " selected" : "") + ">Out</option></select></td>" +
+          "<td><input type=\"text\" value=\"" + escapeHtml(row.description || "") + "\" data-field=\"description\" style=\"min-width:160px;\"></td>" +
+          "<td><input type=\"text\" value=\"" + escapeHtml(row.reference || "") + "\" data-field=\"reference\" style=\"min-width:120px;\"></td>" +
+          "<td style=\"text-align:right;\"><input type=\"number\" step=\"0.01\" value=\"" + (row.amount != null ? row.amount : "") + "\" data-field=\"amount\" style=\"width:100px;text-align:right;\"></td>" +
+          "</tr>"
+        ).join("");
+        previewPanel.classList.remove("hidden");
+        resultEl.textContent = "Parsed " + rows.length + " row(s). Review and confirm or cancel.";
+      } catch (e) {
+        let msg = e.message || "Import failed";
+        try {
+          const j = JSON.parse(e.message);
+          if (j.error) msg = j.error;
+        } catch (_) {}
+        resultEl.textContent = "Error: " + msg;
+      }
+    });
+    document.getElementById("bankImportCancel").addEventListener("click", function () {
+      document.getElementById("bankImportPreviewPanel").classList.add("hidden");
+      document.getElementById("bankCsvFile").value = "";
+      document.getElementById("bankCsvResult").textContent = "";
+      bankImportPendingRows = [];
+    });
+    document.getElementById("bankImportConfirm").addEventListener("click", async function () {
+      const previewBody = document.getElementById("bankImportPreviewRows");
+      const resultEl = document.getElementById("bankCsvResult");
+      const previewPanel = document.getElementById("bankImportPreviewPanel");
+      const rows = [];
+      previewBody.querySelectorAll("tr").forEach(function (tr) {
+        const date = tr.querySelector("[data-field=date]").value.trim();
+        if (!date) return;
+        rows.push({
+          date: date,
+          type: tr.querySelector("[data-field=type]").value,
+          description: tr.querySelector("[data-field=description]").value.trim() || "Imported",
+          reference: tr.querySelector("[data-field=reference]").value.trim(),
+          amount: parseFloat(tr.querySelector("[data-field=amount]").value) || 0
+        });
+      });
+      if (rows.length === 0) {
+        resultEl.textContent = "No valid rows to import.";
+        return;
+      }
+      try {
+        const r = await apiPost("/api/bank-transactions/import/confirm", { rows: rows });
         resultEl.textContent = "Imported " + (r.imported || 0) + " transaction(s).";
-        input.value = "";
+        previewPanel.classList.add("hidden");
+        document.getElementById("bankCsvFile").value = "";
+        bankImportPendingRows = [];
         data.bankTransactions = await apiGet("/api/bank-transactions");
         renderBank();
         renderReconciliation();
@@ -3419,11 +4294,166 @@
       if (e.target.id === "saleEditModal") document.getElementById("saleEditModal").classList.add("hidden");
     });
     document.getElementById("reconMatchSelected").addEventListener("click", performReconMatchSelected);
-    document.getElementById("reconRows").addEventListener("change", (event) => {
-      if (event.target.classList.contains("recon-open-cb")) {
+    document.getElementById("reconCreateAdjustment").addEventListener("click", async function () {
+      const btn = document.getElementById("reconCreateAdjustment");
+      const raw = btn.dataset.adjustmentAmount;
+      if (raw == null || raw === "") return;
+      const adjAmount = parseFloat(raw);
+      if (!isFinite(adjAmount) || adjAmount < 0.01) return;
+      const amount = Math.round(adjAmount * 100) / 100;
+      const today = new Date().toISOString().slice(0, 10);
+      const formData = new FormData();
+      formData.append("date", today);
+      formData.append("vendor", "Reconciliation adjustment");
+      formData.append("category", "Adjustment");
+      formData.append("amount", String(amount));
+      formData.append("vat", "0");
+      formData.append("notes", "Created from reconciliation to balance bank match.");
+      try {
+        const r = await fetch("/api/expenses", {
+          method: "POST",
+          body: formData,
+          credentials: "same-origin",
+        });
+        if (r.status === 401) {
+          window.location.href = "/login";
+          return;
+        }
+        const body = await r.json().catch(() => ({}));
+        if (!r.ok) {
+          alert(body.message || body.error || "Failed to create adjustment expense.");
+          return;
+        }
+        await loadAll();
+        if (body.id) reconSuggestedPreSelect = { type: "expense", id: body.id };
+        renderReconciliation();
         updateReconMatchButton();
+        const overview = document.getElementById("reconSelectionOverview");
+        if (overview) overview.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      } catch (e) {
+        alert(e.message || "Failed to create adjustment expense.");
       }
     });
+    document.getElementById("reconOpenNewExpenseModal").addEventListener("click", function () {
+      const tx = reconSelectedBankId ? data.bankTransactions.find((t) => t.id === reconSelectedBankId) : null;
+      if (!tx || tx.type !== "out") return;
+      document.getElementById("reconExpenseDate").value = tx.date || new Date().toISOString().slice(0, 10);
+      document.getElementById("reconExpenseVendor").value = (tx.description || "").trim().slice(0, 200) || "";
+      document.getElementById("reconExpenseAmount").value = String(Number(tx.amount) || 0);
+      document.getElementById("reconExpenseVat").value = "0";
+      document.getElementById("reconExpenseReference").value = (tx.reference || "").trim().slice(0, 200) || "";
+      document.getElementById("reconExpenseNotes").value = [tx.reference, tx.description].filter(Boolean).join(" | ").slice(0, 500) || "";
+      document.getElementById("reconNewExpenseError").style.display = "none";
+      const catSelect = document.getElementById("reconExpenseCategory");
+      if (catSelect) {
+        catSelect.innerHTML = '<option value="">-- Select category --</option>';
+        (data.expenseCategories || []).forEach((c) => {
+          const opt = document.createElement("option");
+          opt.value = c.id || "";
+          opt.textContent = c.name || "";
+          if ((c.name || "").toLowerCase().includes("adjustment")) opt.selected = true;
+          catSelect.appendChild(opt);
+        });
+        if (!catSelect.value && catSelect.options.length > 1) catSelect.options[1].selected = true;
+      }
+      document.getElementById("reconNewExpenseModal").classList.remove("hidden");
+    });
+    document.getElementById("reconNewExpenseCancel").addEventListener("click", function () {
+      document.getElementById("reconNewExpenseModal").classList.add("hidden");
+    });
+    document.getElementById("reconNewExpenseModal").addEventListener("click", function (e) {
+      if (e.target.id === "reconNewExpenseModal") document.getElementById("reconNewExpenseModal").classList.add("hidden");
+    });
+    document.getElementById("reconNewExpenseForm").addEventListener("submit", async function (e) {
+      e.preventDefault();
+      const errEl = document.getElementById("reconNewExpenseError");
+      errEl.style.display = "none";
+      const date = document.getElementById("reconExpenseDate").value.trim();
+      const vendor = document.getElementById("reconExpenseVendor").value.trim();
+      if (!vendor) {
+        errEl.textContent = "Vendor is required.";
+        errEl.style.display = "block";
+        return;
+      }
+      const amount = parseFloat(document.getElementById("reconExpenseAmount").value);
+      if (!isFinite(amount) || amount < 0) {
+        errEl.textContent = "Enter a valid amount.";
+        errEl.style.display = "block";
+        return;
+      }
+      const vat = parseFloat(document.getElementById("reconExpenseVat").value) || 0;
+      const reference = document.getElementById("reconExpenseReference").value.trim();
+      const notes = document.getElementById("reconExpenseNotes").value.trim();
+      const categoryId = document.getElementById("reconExpenseCategory").value;
+      const formData = new FormData();
+      formData.append("date", date);
+      formData.append("vendor", vendor);
+      formData.append("amount", String(amount));
+      formData.append("vat", String(vat));
+      if (categoryId) formData.append("categoryId", categoryId);
+      if (reference) formData.append("invoiceNumber", reference);
+      formData.append("notes", notes || "Created from reconciliation (bank transaction).");
+      try {
+        const r = await fetch("/api/expenses", { method: "POST", body: formData, credentials: "same-origin" });
+        if (r.status === 401) {
+          window.location.href = "/login";
+          return;
+        }
+        const body = await r.json().catch(() => ({}));
+        if (!r.ok) {
+          errEl.textContent = body.message || body.error || "Failed to create expense.";
+          errEl.style.display = "block";
+          return;
+        }
+        document.getElementById("reconNewExpenseModal").classList.add("hidden");
+        if (body.id) reconSuggestedPreSelect = { type: "expense", id: body.id };
+        await loadAll();
+        renderReconciliation();
+        updateReconMatchButton();
+      } catch (e) {
+        errEl.textContent = e.message || "Request failed.";
+        errEl.style.display = "block";
+      }
+    });
+    document.getElementById("reconOpenPanel").addEventListener("click", (event) => {
+      const bankRow = event.target.closest("#reconBankRows tr.recon-bank-row");
+      if (bankRow && bankRow.dataset.txId) {
+        reconSelectedBankId = bankRow.dataset.txId;
+        renderReconciliation();
+        return;
+      }
+      const useSuggestedBtn = event.target.closest("#reconUseSuggested");
+      if (useSuggestedBtn) {
+        const block = document.getElementById("reconSuggestedBlock");
+        const type = block && block.dataset.suggestedType;
+        const id = block && block.dataset.suggestedId;
+        if (type && id) {
+          reconSuggestedPreSelect = { type, id };
+          renderReconciliation();
+        }
+        return;
+      }
+      const chooseOtherBtn = event.target.closest("#reconChooseOther");
+      if (chooseOtherBtn) {
+        reconSuggestedPreSelect = null;
+        document.querySelectorAll("#reconExpenseRows .recon-expense-cb:checked").forEach((cb) => { cb.checked = false; });
+        updateReconMatchButton();
+        return;
+      }
+    });
+    document.getElementById("reconExpenseRows").addEventListener("change", (event) => {
+      if (event.target.classList.contains("recon-expense-cb")) {
+        if (event.target.classList.contains("recon-sale-cb") && event.target.checked) {
+          document.querySelectorAll("#reconExpenseRows .recon-sale-cb").forEach((cb) => { if (cb !== event.target) cb.checked = false; });
+        }
+        updateReconMatchButton();
+        renderReconciliation();
+      }
+    });
+    const reconBankSearchEl = document.getElementById("reconBankSearch");
+    if (reconBankSearchEl) reconBankSearchEl.addEventListener("input", () => renderReconciliation());
+    const reconExpenseSearchEl = document.getElementById("reconExpenseSearch");
+    if (reconExpenseSearchEl) reconExpenseSearchEl.addEventListener("input", () => renderReconciliation());
     document.getElementById("reconPairedRows").addEventListener("click", async (event) => {
       const unmatchBtn = event.target.closest("button[data-action='unmatch']");
       if (unmatchBtn) {
@@ -3522,11 +4552,231 @@
       const data = await res.json().catch(() => ({}));
       if (res.ok) {
         createUserModal.classList.add("hidden");
+        loadAdminData();
         return;
       }
       createUserError.textContent = data.error || "Failed to create user.";
       createUserError.style.display = "block";
     });
+
+    // Admin: users list edit / delete
+    document.getElementById("adminUsersList").addEventListener("click", async (event) => {
+      const editBtn = event.target.closest("button[data-action='edit-user']");
+      if (editBtn) {
+        const userId = editBtn.dataset.userId;
+        const role = editBtn.dataset.role || "user";
+        const level = editBtn.dataset.level || "1";
+        document.getElementById("editUserId").value = userId || "";
+        document.getElementById("editUserRole").value = role;
+        document.getElementById("editUserHierarchy").value = level;
+        document.getElementById("editUserError").style.display = "none";
+        document.getElementById("editUserModal").classList.remove("hidden");
+        return;
+      }
+      const btn = event.target.closest("button[data-action='delete-user']");
+      if (!btn) return;
+      const userId = btn.dataset.userId;
+      if (!userId || !confirm("Delete this user? They will no longer be able to log in.")) return;
+      try {
+        const res = await fetch("/api/auth/users/" + encodeURIComponent(userId), { method: "DELETE", credentials: "same-origin" });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok) loadAdminData();
+        else alert(data.error || "Failed to delete user.");
+      } catch (e) {
+        alert("Failed to delete user.");
+      }
+    });
+
+    const editUserModal = document.getElementById("editUserModal");
+    document.getElementById("editUserSave").addEventListener("click", async () => {
+      const id = document.getElementById("editUserId").value.trim();
+      const role = document.getElementById("editUserRole").value;
+      const hierarchyLevel = parseInt(document.getElementById("editUserHierarchy").value, 10);
+      const errEl = document.getElementById("editUserError");
+      errEl.style.display = "none";
+      if (!id) return;
+      try {
+        const res = await fetch("/api/auth/users/" + encodeURIComponent(id), {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          credentials: "same-origin",
+          body: JSON.stringify({ role, hierarchyLevel }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          errEl.textContent = data.error || "Update failed.";
+          errEl.style.display = "block";
+          return;
+        }
+        editUserModal.classList.add("hidden");
+        loadAdminData();
+        if (currentUser.userId === id) {
+          currentUser.role = data.role || role;
+          currentUser.hierarchyLevel = data.hierarchyLevel != null ? data.hierarchyLevel : hierarchyLevel;
+        }
+      } catch (e) {
+        errEl.textContent = e.message || "Request failed.";
+        errEl.style.display = "block";
+      }
+    });
+    document.getElementById("editUserCancel").addEventListener("click", () => editUserModal.classList.add("hidden"));
+    editUserModal.addEventListener("click", (e) => { if (e.target === editUserModal) editUserModal.classList.add("hidden"); });
+
+    document.getElementById("btnAddApprover").addEventListener("click", () => {
+      if ((approvalSettings.approvers || []).length >= 5) return;
+      approvalSettings.approvers = approvalSettings.approvers || [];
+      approvalSettings.approvers.push({ userId: "", level: 0 });
+      renderApprovalSettings();
+    });
+    document.getElementById("btnSaveApprovalSettings").addEventListener("click", async () => {
+      const enabled = document.getElementById("approvalEnabled").checked;
+      const container = document.getElementById("approvalApproversList");
+      const approvers = [];
+      if (container) {
+        container.querySelectorAll("select[name='approverUserId']").forEach((sel, i) => {
+          const uid = sel.value?.trim();
+          const levelSel = container.querySelectorAll("select[name='approverLevel']")[i];
+          const level = levelSel ? parseInt(levelSel.value, 10) : 0;
+          if (uid) approvers.push({ userId: uid, level });
+        });
+      }
+      try {
+        await apiPut("/api/approval-settings", { enabled, approvers });
+        approvalSettings.enabled = enabled;
+        approvalSettings.approvers = approvers;
+      } catch (e) {
+        alert(e.message || "Failed to save approval settings.");
+      }
+    });
+
+    let rejectExpenseId = null;
+    document.getElementById("taskApprovalRows").addEventListener("click", async (event) => {
+      const approveBtn = event.target.closest("button[data-action='approve-expense']");
+      if (approveBtn) {
+        const id = approveBtn.dataset.id;
+        if (!id) return;
+        try {
+          await apiPost("/api/expenses/" + encodeURIComponent(id) + "/approve", {});
+          await loadTasks();
+          await loadExpenses();
+          renderExpenses();
+        } catch (e) {
+          alert(e.message || "Approve failed.");
+        }
+        return;
+      }
+      const rejectBtn = event.target.closest("button[data-action='reject-expense']");
+      if (rejectBtn) {
+        rejectExpenseId = rejectBtn.dataset.id;
+        document.getElementById("rejectNote").value = "";
+        document.getElementById("rejectModal").classList.remove("hidden");
+      }
+    });
+    document.getElementById("rejectConfirmBtn").addEventListener("click", async () => {
+      if (!rejectExpenseId) return;
+      const note = document.getElementById("rejectNote").value.trim();
+      try {
+        await apiPost("/api/expenses/" + encodeURIComponent(rejectExpenseId) + "/reject", { note: note || undefined });
+        document.getElementById("rejectModal").classList.add("hidden");
+        rejectExpenseId = null;
+        await loadTasks();
+        await loadExpenses();
+        renderExpenses();
+      } catch (e) {
+        alert(e.message || "Reject failed.");
+      }
+    });
+    document.getElementById("rejectCancelBtn").addEventListener("click", () => {
+      document.getElementById("rejectModal").classList.add("hidden");
+      rejectExpenseId = null;
+    });
+    document.getElementById("rejectModal").addEventListener("click", (e) => {
+      if (e.target.id === "rejectModal") { document.getElementById("rejectModal").classList.add("hidden"); rejectExpenseId = null; }
+    });
+
+    // Admin: categories list edit / delete
+    document.getElementById("adminCategoriesList").addEventListener("click", async (event) => {
+      const editBtn = event.target.closest("button[data-action='edit-category']");
+      if (editBtn) {
+        const cat = adminCategories.find((c) => c.id === editBtn.dataset.categoryId);
+        if (cat) openCategoryModal(cat);
+        return;
+      }
+      const deleteBtn = event.target.closest("button[data-action='delete-category']");
+      if (deleteBtn) {
+        const id = deleteBtn.dataset.categoryId;
+        if (!id || !confirm("Delete this category? Expenses using it will keep the name but lose the link.")) return;
+        try {
+          await fetch("/api/expense-categories/" + encodeURIComponent(id), { method: "DELETE", credentials: "same-origin" });
+          loadAdminData();
+          data.expenseCategories = data.expenseCategories.filter((c) => c.id !== id);
+          updateExpenseCategorySelect();
+          updateSupplierCategorySelects();
+        } catch (e) {
+          alert("Failed to delete category.");
+        }
+      }
+    });
+
+    document.getElementById("btnAddCategory").addEventListener("click", () => openCategoryModal(null));
+    const categoryModalEl = document.getElementById("categoryModal");
+    const categoryErrorEl = document.getElementById("categoryError");
+    document.getElementById("categoryCancel").addEventListener("click", () => categoryModalEl.classList.add("hidden"));
+    categoryModalEl.addEventListener("click", (e) => { if (e.target === categoryModalEl) categoryModalEl.classList.add("hidden"); });
+    document.getElementById("categoryForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      categoryErrorEl.style.display = "none";
+      const id = document.getElementById("categoryId").value.trim();
+      const payload = {
+        name: document.getElementById("categoryName").value.trim(),
+        description: document.getElementById("categoryDescription").value.trim(),
+        defaultVatRate: parseFloat(document.getElementById("categoryDefaultVatRate").value) || 21,
+        accountCode: document.getElementById("categoryAccountCode").value.trim(),
+        sortOrder: parseInt(document.getElementById("categorySortOrder").value, 10) || 0
+      };
+      try {
+        if (id) {
+          const res = await fetch("/api/expense-categories/" + encodeURIComponent(id), {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            credentials: "same-origin",
+            body: JSON.stringify(payload)
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) { categoryErrorEl.textContent = data.error || "Update failed."; categoryErrorEl.style.display = "block"; return; }
+        } else {
+          const res = await fetch("/api/expense-categories", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "same-origin",
+            body: JSON.stringify(payload)
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) { categoryErrorEl.textContent = data.error || "Create failed."; categoryErrorEl.style.display = "block"; return; }
+        }
+        categoryModalEl.classList.add("hidden");
+        loadAdminData();
+        const cats = await apiGet("/api/expense-categories");
+        data.expenseCategories = Array.isArray(cats) ? cats : [];
+        updateExpenseCategorySelect();
+        updateSupplierCategorySelects();
+      } catch (err) {
+        categoryErrorEl.textContent = err.message || "Request failed.";
+        categoryErrorEl.style.display = "block";
+      }
+    });
+
+    function openCategoryModal(category) {
+      document.getElementById("categoryModalTitle").textContent = category ? "Edit category" : "Add category";
+      document.getElementById("categoryId").value = category ? category.id : "";
+      document.getElementById("categoryName").value = category ? category.name || "" : "";
+      document.getElementById("categoryDescription").value = category ? category.description || "" : "";
+      document.getElementById("categoryDefaultVatRate").value = category != null && category.defaultVatRate != null ? category.defaultVatRate : "21";
+      document.getElementById("categoryAccountCode").value = category ? category.accountCode || "" : "";
+      document.getElementById("categorySortOrder").value = category != null && category.sortOrder != null ? category.sortOrder : "0";
+      document.getElementById("categoryError").style.display = "none";
+      categoryModalEl.classList.remove("hidden");
+    }
 
     // Customer select change handler
     document.getElementById("saleCustomerSelect").addEventListener("change", (e) => {
@@ -3789,6 +5039,8 @@
         document.getElementById("customerEditModal").classList.add("hidden");
         document.getElementById("supplierEditModal").classList.add("hidden");
         document.getElementById("changePasswordModal").classList.add("hidden");
+        document.getElementById("createUserModal").classList.add("hidden");
+        document.getElementById("categoryModal").classList.add("hidden");
       }
     });
 
@@ -3798,6 +5050,21 @@
         window.location.href = "/login";
         return;
       }
+      try {
+        const me = await apiGet("/api/auth/me");
+        if (me && me.userId) {
+          currentUser.userId = me.userId;
+          currentUser.role = me.role || "user";
+          currentUser.hierarchyLevel = me.hierarchyLevel != null ? me.hierarchyLevel : 1;
+        }
+      } catch (_) { /* not logged in */ }
+      try {
+        const settings = await apiGet("/api/approval-settings");
+        if (settings) {
+          approvalSettings.enabled = !!settings.enabled;
+          approvalSettings.approvers = Array.isArray(settings.approvers) ? settings.approvers : [];
+        }
+      } catch (_) { /* ignore */ }
       await loadAll();
       updateSaleTotalsFromLines();
       calculateExpenseVat();

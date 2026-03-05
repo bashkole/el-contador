@@ -2,8 +2,7 @@ const { GoogleGenAI } = require('@google/genai');
 const fs = require('fs');
 const path = require('path');
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3.1-flash-lite-preview';
+const DEFAULT_MODEL = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
 
 // Invoice data extraction prompt
 const INVOICE_EXTRACTION_PROMPT = `Extract the following information from this invoice/receipt image or PDF.
@@ -36,14 +35,17 @@ Important:
 /**
  * Extract invoice data from an image or PDF file using Gemini
  * @param {string} filePath - Path to the invoice file
+ * @param {Object} [options] - Optional: apiKey and model (from admin settings). If omitted, uses env GEMINI_API_KEY / GEMINI_MODEL.
  * @returns {Promise<Object>} Extracted invoice data
  */
-async function extractInvoiceData(filePath) {
-  if (!GEMINI_API_KEY) {
-    throw new Error('GEMINI_API_KEY environment variable not set');
+async function extractInvoiceData(filePath, options = {}) {
+  const apiKey = options.apiKey || process.env.GEMINI_API_KEY;
+  const model = options.model || process.env.GEMINI_MODEL || DEFAULT_MODEL;
+  if (!apiKey) {
+    throw new Error('Gemini API key not set. Add it in Invoice settings or set GEMINI_API_KEY in .env');
   }
 
-  const genAI = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+  const genAI = new GoogleGenAI({ apiKey });
   
   // Read file and convert to base64
   const fileBuffer = fs.readFileSync(filePath);
@@ -60,7 +62,7 @@ async function extractInvoiceData(filePath) {
 
   try {
     const result = await genAI.models.generateContent({
-      model: GEMINI_MODEL,
+      model,
       contents: [
         {
           role: 'user',

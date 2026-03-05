@@ -37,6 +37,8 @@ function parseDate(s) {
   }
   const iso = t.match(/^(\d{4})[\/\-](\d{2})[\/\-](\d{2})$/);
   if (iso) return iso[1] + '-' + iso[2] + '-' + iso[3];
+  const yyyymmdd = t.match(/^(\d{4})(\d{2})(\d{2})$/);
+  if (yyyymmdd) return yyyymmdd[1] + '-' + yyyymmdd[2] + '-' + yyyymmdd[3];
   return null;
 }
 
@@ -62,15 +64,25 @@ function findColumnIndex(headers, names) {
   return -1;
 }
 
-router.post('/import', upload.single('file'), async (req, res) => {
-  if (!req.file || !req.file.buffer) {
-    return res.status(400).json({ error: 'No file uploaded' });
-  }
-  const text = req.file.buffer.toString('utf8');
+/** Extract /REMI/ value from SEPA-style description (up to next /KEY/ or end). */
+function extractRemi(description) {
+  if (!description || typeof description !== 'string') return '';
+  const match = description.match(/\/REMI\/(.*?)(?=\/(?:EREF|IBAN|BIC|NAME|TRTP|CSID|MARF)\/|$)/s);
+  return match ? match[1].replace(/\s+/g, ' ').trim() : '';
+}
+
+/** Parse description: use REMI as primary label when present; otherwise full description. */
+function normalizeDescriptionAndReference(rawDescription, explicitReference) {
+  const remi = extractRemi(rawDescription);
+  const reference = (explicitReference && String(explicitReference).trim()) || remi;
+  const description = remi || (rawDescription && rawDescription.trim()) || 'Imported';
+  return { description, reference };
+}
+
+/** Parse CSV text into normalized rows for import. Returns { rows } or { error }. */
+function parseCsvToRows(text) {
   const lines = text.split(/\n/).filter((l) => l.trim());
-  if (lines.length === 0) {
-    return res.status(400).json({ error: 'CSV is empty' });
-  }
+  if (lines.length === 0) return { error: 'CSV is empty' };
   const rows = lines.map(parseCsvLine);
   let start = 0;
   let dateCol = 0;
@@ -79,13 +91,19 @@ router.post('/import', upload.single('file'), async (req, res) => {
   let descCol = 3;
   let refCol = 4;
   const first = rows[0].map((c) => c.toLowerCase());
-  if (first.some((c) => c.includes('date') || c.includes('amount') || c === 'type' || c === 'description')) {
+  if (first.some((c) => c.includes('date') || c.includes('amount') || c === 'type' || c === 'description') ||
+      first.some((c) => c.includes('transactiondate') || c.includes('valuedate') || c.includes('bedrag'))) {
     const headers = rows[0];
-    dateCol = findColumnIndex(headers, ['date', 'datum', 'booking']) >= 0 ? findColumnIndex(headers, ['date', 'datum', 'booking']) : 0;
-    typeCol = findColumnIndex(headers, ['type', 'credit', 'debit', 'in', 'out']) >= 0 ? findColumnIndex(headers, ['type', 'credit', 'debit', 'in', 'out']) : 1;
-    amountCol = findColumnIndex(headers, ['amount', 'bedrag', 'value']) >= 0 ? findColumnIndex(headers, ['amount', 'bedrag', 'value']) : 2;
-    descCol = findColumnIndex(headers, ['description', 'desc', 'omschrijving', 'name', 'counter']) >= 0 ? findColumnIndex(headers, ['description', 'desc', 'omschrijving', 'name', 'counter']) : 3;
-    refCol = findColumnIndex(headers, ['reference', 'ref', 'referentie']) >= 0 ? findColumnIndex(headers, ['reference', 'ref', 'referentie']) : 4;
+    dateCol = findColumnIndex(headers, ['transactiondate', 'valuedate', 'date', 'datum', 'booking']);
+    if (dateCol < 0) dateCol = 0;
+    typeCol = findColumnIndex(headers, ['type', 'credit', 'debit', 'in', 'out']);
+    if (typeCol < 0) typeCol = -1;
+    amountCol = findColumnIndex(headers, ['amount', 'bedrag', 'value']);
+    if (amountCol < 0) amountCol = 2;
+    descCol = findColumnIndex(headers, ['description', 'desc', 'omschrijving', 'name', 'counterparty']);
+    if (descCol < 0) descCol = 3;
+    refCol = findColumnIndex(headers, ['reference', 'ref', 'referentie']);
+    if (refCol < 0) refCol = -1;
     start = 1;
   }
   const toInsert = [];
@@ -93,9 +111,9 @@ router.post('/import', upload.single('file'), async (req, res) => {
     const row = rows[i];
     const date = parseDate(row[dateCol]);
     if (!date) continue;
-    let amount = parseAmount(row[amountCol]);
-    const typeVal = (row[typeCol] || '').trim().toLowerCase();
-    let type = parseType(row[typeCol]);
+    let amount = parseAmount(row[amountCol] != null ? row[amountCol] : row[2]);
+    const typeVal = typeCol >= 0 ? (row[typeCol] || '').trim().toLowerCase() : '';
+    let type = typeCol >= 0 ? parseType(row[typeCol]) : (amount < 0 ? 'out' : 'in');
     if (typeVal !== 'in' && typeVal !== 'out' && typeVal !== 'credit' && typeVal !== 'debit' && typeVal !== '+' && typeVal !== '-' && typeVal !== 'cr' && typeVal !== 'dr') {
       if (amount < 0) {
         type = 'out';
@@ -104,20 +122,45 @@ router.post('/import', upload.single('file'), async (req, res) => {
         type = 'in';
       }
     }
-    const description = (row[descCol] || '').trim() || 'Imported';
-    const reference = (row[refCol] || '').trim();
+    const rawDescription = (row[descCol] != null ? row[descCol] : row[3] != null ? row[3] : '') || '';
+    const explicitRef = refCol >= 0 ? (row[refCol] || '').trim() : '';
+    const { description, reference } = normalizeDescriptionAndReference(rawDescription, explicitRef);
     toInsert.push({ date, type, amount, reference, description });
   }
   if (toInsert.length === 0) {
-    return res.status(400).json({ error: 'No valid rows found. CSV should have columns: date, type, amount, description, reference (or use this order without header).' });
+    return { error: 'No valid rows found. CSV should have columns: date, type, amount, description, reference (or use this order without header).' };
+  }
+  return { rows: toInsert };
+}
+
+router.post('/import/preview', upload.single('file'), (req, res) => {
+  if (!req.file || !req.file.buffer) {
+    return res.status(400).json({ error: 'No file uploaded' });
+  }
+  const text = req.file.buffer.toString('utf8');
+  const result = parseCsvToRows(text);
+  if (result.error) return res.status(400).json({ error: result.error });
+  return res.json({ preview: result.rows });
+});
+
+router.post('/import/confirm', async (req, res) => {
+  const rows = req.body && req.body.rows;
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return res.status(400).json({ error: 'No rows to import. Send { rows: [{ date, type, amount, description, reference }, ...] }.' });
   }
   const client = await pool.connect();
   try {
     let inserted = 0;
-    for (const row of toInsert) {
+    for (const row of rows) {
+      const date = row.date && String(row.date).trim();
+      const type = row.type === 'in' ? 'in' : 'out';
+      const amount = Math.round((Number(row.amount) || 0) * 100) / 100;
+      const description = (row.description != null ? String(row.description) : '').trim() || 'Imported';
+      const reference = (row.reference != null ? String(row.reference) : '').trim();
+      if (!date) continue;
       await client.query(
         'INSERT INTO bank_transactions (date, type, amount, reference, description) VALUES ($1, $2, $3, $4, $5)',
-        [row.date, row.type, row.amount, row.reference, row.description]
+        [date, type, amount, reference, description]
       );
       inserted++;
     }
