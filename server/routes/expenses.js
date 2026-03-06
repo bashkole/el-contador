@@ -4,6 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const { pool } = require('../db/pool');
 const { extractInvoiceData } = require('../services/invoice-extraction');
+const { sendApprovalNotification } = require('../services/email');
 
 const uploadDir = path.join(__dirname, '..', 'uploads', 'expenses');
 if (!fs.existsSync(uploadDir)) {
@@ -293,6 +294,27 @@ router.post('/', upload.single('file'), async (req, res) => {
         );
       }
     }
+
+    // Notify the first approver
+    const firstApprover = await pool.query(
+      `SELECT ea.approver_user_id, u.email 
+       FROM expense_approvals ea 
+       JOIN users u ON ea.approver_user_id = u.id 
+       WHERE ea.expense_id = $1 AND ea.status = 'pending' 
+       ORDER BY ea.approver_level DESC 
+       LIMIT 1`,
+      [expenseId]
+    );
+    if (firstApprover.rows.length > 0) {
+      const approverEmail = firstApprover.rows[0].email;
+      sendApprovalNotification(approverEmail, {
+        id: expenseId,
+        vendor: row.vendor,
+        date: row.date,
+        amount: Number(row.amount),
+        category: row.category || categoryName,
+      });
+    }
   }
 
   const payload = {
@@ -450,6 +472,32 @@ router.post('/:id/approve', async (req, res) => {
   );
   if (remaining.rows.length === 0) {
     await pool.query(`UPDATE expenses SET approval_status = 'approved' WHERE id = $1`, [expenseId]);
+  } else {
+    // Notify the next approver
+    const nextApprover = await pool.query(
+      `SELECT ea.approver_user_id, u.email 
+       FROM expense_approvals ea 
+       JOIN users u ON ea.approver_user_id = u.id 
+       WHERE ea.expense_id = $1 AND ea.status = 'pending' 
+       ORDER BY ea.approver_level DESC 
+       LIMIT 1`,
+      [expenseId]
+    );
+    if (nextApprover.rows.length > 0) {
+      // Need expense details to send email
+      const expDetails = await pool.query('SELECT vendor, date, amount, category FROM expenses WHERE id = $1', [expenseId]);
+      if (expDetails.rows.length > 0) {
+        const expRow = expDetails.rows[0];
+        const approverEmail = nextApprover.rows[0].email;
+        sendApprovalNotification(approverEmail, {
+          id: expenseId,
+          vendor: expRow.vendor,
+          date: expRow.date,
+          amount: Number(expRow.amount),
+          category: expRow.category,
+        });
+      }
+    }
   }
   res.json({ ok: true, approvalStatus: remaining.rows.length === 0 ? 'approved' : 'pending' });
 });

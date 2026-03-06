@@ -1028,18 +1028,6 @@
         </div>
       </div>
 
-      <div id="bankDeleteModal" class="modal-overlay hidden">
-        <div class="panel" style="max-width: 400px; width: 100%; margin: 16px;">
-          <h2>Delete bank transaction</h2>
-          <p>This will permanently remove this line from the bank account. This cannot be undone.</p>
-          <p class="small" style="color: var(--muted);">Only unpaired lines can be deleted. Use this to remove duplicated or mistaken imports.</p>
-          <div class="actions" style="margin-top: 16px;">
-            <button type="button" id="bankDeleteConfirm" class="btn-primary">Confirm deletion</button>
-            <button type="button" id="bankDeleteCancel" class="btn-secondary">Cancel</button>
-          </div>
-        </div>
-      </div>
-
       <div id="categoryModal" class="modal-overlay hidden">
         <div class="panel" style="max-width: 440px; width: 100%; margin: 16px;">
           <h2 id="categoryModalTitle">Add category</h2>
@@ -1074,6 +1062,18 @@
         </div>
       </div>
     </section>
+
+    <div id="bankDeleteModal" class="modal-overlay hidden" style="z-index: 1000;" aria-modal="true" role="dialog" aria-labelledby="bankDeleteModalTitle">
+      <div class="panel" style="max-width: 400px; width: 100%; margin: 16px; box-shadow: 0 8px 32px rgba(0,0,0,0.3);">
+        <h2 id="bankDeleteModalTitle">Delete bank transaction</h2>
+        <p>This will permanently remove this line from the bank account. This cannot be undone.</p>
+        <p class="small" style="color: var(--muted);">Only unpaired lines can be deleted. Use this to remove duplicated or mistaken imports.</p>
+        <div class="actions" style="margin-top: 16px;">
+          <button type="button" id="bankDeleteConfirm" class="btn-primary">Confirm deletion</button>
+          <button type="button" id="bankDeleteCancel" class="btn-secondary">Cancel</button>
+        </div>
+      </div>
+    </div>
 
     <section id="tab-bank" class="tab-content hidden">
       <div class="panel">
@@ -1743,9 +1743,33 @@
 
     function renderExpenses() {
       const rows = document.getElementById("expenseRows");
+      if (!rows) return;
       rows.innerHTML = "";
-      data.expenses
-        .slice()
+      
+      let filtered = data.expenses.slice();
+      
+      if (expenseFilter === 'open') {
+        filtered = filtered.filter(e => !e.reconciled);
+      } else if (expenseFilter === 'paired') {
+        filtered = filtered.filter(e => e.reconciled);
+      } else if (expenseFilter === 'pending_approval') {
+        filtered = filtered.filter(e => e.approvalStatus === 'pending' || e.approval_status === 'pending');
+      }
+      
+      if (expenseSearchTerm) {
+        const term = expenseSearchTerm.toLowerCase();
+        filtered = filtered.filter(e => {
+          const vendor = (e.vendor || '').toLowerCase();
+          const invoice = (e.invoiceNumber || e.invoice_number || '').toLowerCase();
+          const notes = (e.notes || '').toLowerCase();
+          const category = (e.categoryName || e.category || '').toLowerCase();
+          const amountStr = String(e.amount || '');
+          const totalStr = String((Number(e.amount) || 0) + (Number(e.vat) || 0));
+          return vendor.includes(term) || invoice.includes(term) || notes.includes(term) || category.includes(term) || amountStr.includes(term) || totalStr.includes(term);
+        });
+      }
+
+      filtered
         .sort((a, b) => new Date(b.date) - new Date(a.date))
         .forEach((item) => {
           const tr = document.createElement("tr");
@@ -3038,7 +3062,7 @@
 
     async function loadAll() {
       const [expenses, sales, bankTransactions, customers, suppliers, expenseCategories] = await Promise.all([
-        apiGet("/api/expenses" + (expenseSearchTerm ? "?search=" + encodeURIComponent(expenseSearchTerm) : "")),
+        apiGet("/api/expenses"),
         apiGet("/api/sales"),
         apiGet("/api/bank-transactions"),
         apiGet("/api/customers"),
@@ -3054,14 +3078,8 @@
       renderAll();
     }
 
-    async function loadExpenses(searchTerm, filter) {
-      const term = searchTerm !== undefined ? searchTerm : expenseSearchTerm;
-      const pairing = filter !== undefined ? filter : expenseFilter;
-      const q = new URLSearchParams();
-      if (term) q.set("search", term);
-      if (pairing && pairing !== "all") q.set("filter", pairing);
-      const url = "/api/expenses" + (q.toString() ? "?" + q.toString() : "");
-      data.expenses = await apiGet(url);
+    async function loadExpenses() {
+      data.expenses = await apiGet("/api/expenses");
       renderExpenses();
     }
 
@@ -4336,20 +4354,20 @@
       document.getElementById("expenseSearch").addEventListener("input", function () {
         clearTimeout(expenseSearchTimeout);
         const term = this.value.trim();
-        expenseSearchTimeout = setTimeout(async () => {
+        expenseSearchTimeout = setTimeout(() => {
           expenseSearchTerm = term;
-          await loadExpenses();
+          renderExpenses();
         }, 280);
       });
     })();
-    document.getElementById("expenseFilterToggles").addEventListener("click", async function (e) {
+    document.getElementById("expenseFilterToggles").addEventListener("click", function (e) {
       const btn = e.target.closest(".btn-filter");
       if (!btn) return;
       const filter = btn.getAttribute("data-filter") || "all";
       expenseFilter = filter;
       document.querySelectorAll("#expenseFilterToggles .btn-filter").forEach((b) => b.classList.remove("active"));
       btn.classList.add("active");
-      await loadExpenses();
+      renderExpenses();
     });
     document.getElementById("invoiceSettingsForm").addEventListener("submit", saveInvoiceConfig);
     document.getElementById("cfgLogoUpload").addEventListener("click", uploadLogo);
@@ -4683,6 +4701,15 @@
       modal.dataset.pendingId = id;
       modal.classList.remove("hidden");
     };
+    document.addEventListener("click", function (e) {
+      const btn = e.target.closest(".bank-delete-btn");
+      if (!btn || !btn.dataset.id) return;
+      const bankRows = document.getElementById("bankRows");
+      if (!bankRows || !bankRows.contains(btn)) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      window.openBankDeleteModal(btn.dataset.id);
+    }, true);
     document.getElementById("bankDeleteCancel").addEventListener("click", () => {
       const modal = document.getElementById("bankDeleteModal");
       if (modal) { delete modal.dataset.pendingId; modal.classList.add("hidden"); }
