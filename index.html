@@ -133,30 +133,27 @@
       padding: 6px 12px;
       backdrop-filter: blur(2px);
     }
+
+    @media (max-width: 768px) {
+      body {
+        display: flex;
+        flex-direction: column;
+      }
+      .layout {
+        min-height: 40vh;
+        flex: 1;
+      }
+      .company-logos {
+        position: relative;
+        bottom: auto;
+        flex-direction: column;
+        padding: 24px;
+        margin-bottom: 24px;
+      }
+    }
   </style>
 </head>
 <body>
-  <div class="company-logos">
-    <a href="https://mexart.nl" target="_blank" rel="noopener noreferrer" class="logo-link">
-      <img src="Mexart.png" alt="Mexart" class="brand-logo">
-    </a>
-    <a href="https://flying-cocktails.com" target="_blank" rel="noopener noreferrer" class="logo-link">
-      <img src="Flyingcocktails.png" alt="Flying Cocktails" class="brand-logo">
-    </a>
-    <a href="https://urban-scout.app" target="_blank" rel="noopener noreferrer" class="logo-link">
-      <img src="Urban.png" alt="Urban Scout" class="brand-logo">
-    </a>
-    <a href="https://zintli.app" target="_blank" rel="noopener noreferrer" class="logo-link">
-      <img src="Zintli.png" alt="Zintli" class="brand-logo">
-    </a>
-    <a href="https://cp3.ai" target="_blank" rel="noopener noreferrer" class="logo-link">
-      <img src="cp3.png" alt="CP3" class="brand-logo">
-    </a>
-    <div class="logo-static">
-      <img src="Chilango.png" alt="Chilango Runner" class="brand-logo">
-    </div>
-  </div>
-
   <div class="wave-bg" aria-hidden="true">
     <svg viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
       <defs>
@@ -189,5 +186,26 @@
       <img src="logo.png" alt="El Contador" class="hero-logo" width="280" decoding="async">
     </section>
   </main>
+
+  <div class="company-logos">
+    <a href="https://mexart.nl" target="_blank" rel="noopener noreferrer" class="logo-link">
+      <img src="Mexart.png" alt="Mexart" class="brand-logo">
+    </a>
+    <a href="https://flying-cocktails.com" target="_blank" rel="noopener noreferrer" class="logo-link">
+      <img src="Flyingcocktails.png" alt="Flying Cocktails" class="brand-logo">
+    </a>
+    <a href="https://urban-scout.app" target="_blank" rel="noopener noreferrer" class="logo-link">
+      <img src="Urban.png" alt="Urban Scout" class="brand-logo">
+    </a>
+    <a href="https://zintli.app" target="_blank" rel="noopener noreferrer" class="logo-link">
+      <img src="Zintli.png" alt="Zintli" class="brand-logo">
+    </a>
+    <a href="https://cp3.ai" target="_blank" rel="noopener noreferrer" class="logo-link">
+      <img src="cp3.png" alt="CP3" class="brand-logo">
+    </a>
+    <div class="logo-static">
+      <img src="Chilango.png" alt="Chilango Runner" class="brand-logo">
+    </div>
+  </div>
 </body>
 </html>

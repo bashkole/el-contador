@@ -73,26 +73,23 @@ app.use('/api/customers', requireAuth, customersRoutes);
 app.use('/api/suppliers', requireAuth, suppliersRoutes);
 app.use('/api/reports/vat', requireAuth, vatReportsRoutes);
 
-const adminRoot = path.join(__dirname, '..', 'admin');
+const adminRoot = path.join(__dirname, '..', 'frontend', 'dist');
 
+// SPA handles its own routing, so we don't strictly need to redirect to /login from the server side,
+// but if we want to ensure non-authenticated users get the SPA login view directly:
 function serveLoginIfNeeded(req, res, next) {
-  if (req.path !== '/login' && req.path !== '/login.html' && !req.session?.userId) {
+  if (req.path !== '/login' && !req.session?.userId) {
     return res.redirect('/login');
   }
   next();
 }
 
-app.get('/login', (req, res) => {
-  if (req.session && req.session.userId) {
-    return res.redirect('/');
-  }
-  res.sendFile(path.join(adminRoot, 'login.html'));
-});
-
 app.use(serveLoginIfNeeded);
-app.use(express.static(adminRoot, { index: 'app.html' }));
-app.get('/', (req, res) => {
-  res.sendFile(path.join(adminRoot, 'app.html'));
+app.use(express.static(adminRoot));
+
+// All unknown routes (except /api) should fall back to index.html for React Router
+app.get('*', (req, res) => {
+  res.sendFile(path.join(adminRoot, 'index.html'));
 });
 
 const PORT = parseInt(process.env.PORT || '3000', 10);

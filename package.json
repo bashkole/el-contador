@@ -26,7 +26,7 @@
     "server/index.js",
     "server/package.json",
     "server/package-lock.json",
-    "admin",
+    "frontend/dist",
     "docker-compose.yml",
     ".env.example",
     "README.md",
