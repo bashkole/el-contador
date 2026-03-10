@@ -127,10 +127,11 @@ On Ubuntu: `sudo apt install docker-compose-plugin` (V2) or the standalone `dock
 
 1. Create an npm account at [npmjs.com/signup](https://www.npmjs.com/signup) if needed.
 2. Log in from the package root: `npm login` (username, password, email; OTP if 2FA is enabled).
-3. From this directory (the package root): `npm publish --access public`.  
+3. Build the frontend so the package ships a pre-built `frontend/dist`: run `npm run build` in the `frontend/` directory, then ensure `frontend/dist` is listed in `package.json` `files`.
+4. From this directory (the package root): `npm publish --access public`.  
    `--access public` is required for unscoped packages.
-4. Update `repository.url` in `package.json` to your real Git URL before publishing.
-5. For later releases: bump `version` in both **package.json** (root) and **server/package.json** so the backend log shows the correct release (e.g. `el-contador-server@1.0.7`), then `npm publish` from the package root.
+5. Update `repository.url` in `package.json` to your real Git URL before publishing.
+6. For later releases: bump `version` in both **package.json** (root) and **server/package.json** so the backend log shows the correct release (e.g. `el-contador-server@1.0.7`), then build frontend and `npm publish` from the package root.
 
 ## License
 
