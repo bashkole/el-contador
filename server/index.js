@@ -14,16 +14,22 @@ const bankRoutes = require('./routes/bank');
 const reconciliationRoutes = require('./routes/reconciliation');
 const invoiceConfigRoutes = require('./routes/invoice-config');
 const approvalSettingsRoutes = require('./routes/approval-settings');
+const integrationsRoutes = require('./routes/integrations');
 const dashboardRoutes = require('./routes/dashboard');
 const customersRoutes = require('./routes/customers');
 const suppliersRoutes = require('./routes/suppliers');
+const payeesRoutes = require('./routes/payees');
 const vatReportsRoutes = require('./routes/vat-reports');
+const webhooksRoutes = require('./routes/webhooks');
 
 const PgSession = connectPgSimple(session);
 const app = express();
 
 // Required when behind a reverse proxy (Apache/nginx) so cookies and redirects use correct scheme/host
 app.set('trust proxy', 1);
+
+// Mount webhooks before generic JSON parsing because Stripe requires raw body
+app.use('/api/webhooks', webhooksRoutes);
 
 app.use(cookieParser());
 app.use(express.json());
@@ -61,6 +67,7 @@ app.use(
 );
 
 app.use('/api/auth', authRoutes);
+app.use('/api/public', require('./routes/public'));
 app.use('/api/expenses', requireAuth, expensesRoutes);
 app.use('/api/expense-categories', requireAuth, expenseCategoriesRoutes);
 app.use('/api/sales', requireAuth, salesRoutes);
@@ -68,15 +75,19 @@ app.use('/api/bank-transactions', requireAuth, bankRoutes);
 app.use('/api/reconciliation', requireAuth, reconciliationRoutes);
 app.use('/api/invoice-config', requireAuth, invoiceConfigRoutes);
 app.use('/api/approval-settings', approvalSettingsRoutes);
+app.use('/api/integrations', requireAuth, integrationsRoutes);
 app.use('/api/dashboard', requireAuth, dashboardRoutes);
 app.use('/api/customers', requireAuth, customersRoutes);
 app.use('/api/suppliers', requireAuth, suppliersRoutes);
+app.use('/api/payees', requireAuth, payeesRoutes);
 app.use('/api/reports/vat', requireAuth, vatReportsRoutes);
 
 const adminRoot = path.join(__dirname, '..', 'frontend', 'dist');
 
-// SPA handles its own routing, so we don't strictly need to redirect to /login from the server side,
-// but if we want to ensure non-authenticated users get the SPA login view directly:
+// Serve static assets first so JS/CSS load without going through auth (avoids MIME type errors)
+app.use(express.static(adminRoot));
+
+// Redirect unauthenticated users to login only for page requests (not for /assets/*, etc.)
 function serveLoginIfNeeded(req, res, next) {
   if (req.path !== '/login' && !req.session?.userId) {
     return res.redirect('/login');
@@ -85,7 +96,6 @@ function serveLoginIfNeeded(req, res, next) {
 }
 
 app.use(serveLoginIfNeeded);
-app.use(express.static(adminRoot));
 
 // All unknown routes (except /api) should fall back to index.html for React Router
 app.get('*', (req, res) => {

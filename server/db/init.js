@@ -67,6 +67,8 @@ async function init() {
     await pool.query("ALTER TABLE sales ADD COLUMN IF NOT EXISTS customer_address text");
     await pool.query("ALTER TABLE sales ADD COLUMN IF NOT EXISTS voided boolean NOT NULL DEFAULT false");
     await pool.query("ALTER TABLE sales ADD COLUMN IF NOT EXISTS voided_at timestamptz");
+    await pool.query("ALTER TABLE sales ADD COLUMN IF NOT EXISTS external_id text UNIQUE");
+    await pool.query("ALTER TABLE sales ADD COLUMN IF NOT EXISTS source text");
     await pool.query("ALTER TABLE bank_transactions ADD COLUMN IF NOT EXISTS account_type text");
     await pool.query("ALTER TABLE bank_transactions ADD COLUMN IF NOT EXISTS account_note text");
     await pool.query(`

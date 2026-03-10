@@ -231,6 +231,65 @@ router.post('/', async (req, res) => {
   });
 });
 
+/** Update a bank transaction (date, type, amount, reference, description). */
+router.patch('/:id', async (req, res) => {
+  const id = req.params.id;
+  const { date, type, amount, reference, description } = req.body || {};
+  const r = await pool.query('SELECT id FROM bank_transactions WHERE id = $1', [id]);
+  if (r.rows.length === 0) {
+    return res.status(404).json({ error: 'Bank transaction not found' });
+  }
+  const updates = [];
+  const values = [];
+  let pos = 1;
+  if (date != null) {
+    updates.push(`date = $${pos++}`);
+    values.push(String(date).trim().slice(0, 10));
+  }
+  if (type != null) {
+    updates.push(`type = $${pos++}`);
+    values.push(type === 'in' ? 'in' : 'out');
+  }
+  if (amount != null) {
+    updates.push(`amount = $${pos++}`);
+    values.push(Math.round((Number(amount) || 0) * 100) / 100);
+  }
+  if (reference !== undefined) {
+    updates.push(`reference = $${pos++}`);
+    values.push((reference || '').trim());
+  }
+  if (description !== undefined) {
+    updates.push(`description = $${pos++}`);
+    values.push((description || '').trim());
+  }
+  if (updates.length === 0) {
+    return res.status(400).json({ error: 'No fields to update' });
+  }
+  values.push(id);
+  await pool.query(
+    `UPDATE bank_transactions SET ${updates.join(', ')} WHERE id = $${pos}`,
+    values
+  );
+  const out = await pool.query(
+    'SELECT id, date, type, amount, reference, description, reconciled, reconciliation_ref_type, reconciliation_ref_id, reconciled_at, created_at FROM bank_transactions WHERE id = $1',
+    [id]
+  );
+  const row = out.rows[0];
+  res.json({
+    id: row.id,
+    date: row.date,
+    type: row.type,
+    amount: Number(row.amount),
+    reference: row.reference,
+    description: row.description,
+    reconciled: row.reconciled,
+    reconciliationRefType: row.reconciliation_ref_type,
+    reconciliationRefId: row.reconciliation_ref_id,
+    reconciledAt: row.reconciled_at,
+    createdAt: row.created_at,
+  });
+});
+
 /** Delete a bank transaction (e.g. to remove duplicated import). Only allowed for unpaired lines. */
 router.delete('/:id', async (req, res) => {
   const id = req.params.id;

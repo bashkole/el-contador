@@ -11,6 +11,16 @@ export function useDashboardSummary(period: string) {
   });
 }
 
+export function useExpenseSummary(year: number) {
+  return useQuery({
+    queryKey: ['dashboard', 'expense-summary', year],
+    queryFn: async () => {
+      const { data } = await api.get(`/reports/vat/expense-summary?year=${year}`);
+      return data;
+    },
+  });
+}
+
 export function useVatQuarterly(year: number, quarter: number) {
   return useQuery({
     queryKey: ['vat', 'quarterly', year, quarter],

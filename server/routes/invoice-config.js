@@ -2,6 +2,7 @@ const express = require('express');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const sharp = require('sharp');
 const { pool } = require('../db/pool');
 
 const router = express.Router();
@@ -105,6 +106,15 @@ router.post('/logo', logoUpload.single('file'), async (req, res) => {
     'INSERT INTO invoice_settings (id, data) VALUES (1, $1::jsonb) ON CONFLICT (id) DO UPDATE SET data = $1::jsonb',
     [JSON.stringify(existing)]
   );
+  try {
+    const faviconPath = path.join(logoDir, 'favicon.png');
+    await sharp(req.file.path)
+      .resize(32, 32)
+      .png()
+      .toFile(faviconPath);
+  } catch (err) {
+    process.stderr.write(`[invoice-config] Favicon generation failed: ${err.message}\n`);
+  }
   res.json({ logoPath });
 });
 

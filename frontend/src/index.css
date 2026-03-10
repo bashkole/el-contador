@@ -25,11 +25,23 @@
     --border: oklch(0.922 0 0);
     --input: oklch(0.922 0 0);
     --ring: oklch(0.708 0 0);
+    /* Chart palette (pie/bar charts) */
     --chart-1: oklch(0.809 0.105 251.813);
     --chart-2: oklch(0.623 0.214 259.815);
     --chart-3: oklch(0.546 0.245 262.881);
     --chart-4: oklch(0.488 0.243 264.376);
     --chart-5: oklch(0.424 0.199 265.638);
+    --chart-6: oklch(0.72 0.19 165);
+    --chart-7: oklch(0.6 0.22 25);
+    --chart-8: oklch(0.45 0.2 265);
+    --chart-revenue: lch(73.2% 44.87 177.66)
+    --chart-expenses: lch(52.4% 74.12 16.07);
+    /* Reconciliation match block */
+    --reconciliation-match-bg: #eff6ff;
+    --reconciliation-match-border: lch(88.74% 26.13 221.7);
+    --reconciliation-match-muted-bg: rgba(239, 246, 255, 0.6);
+    --reconciliation-selected-bg: #eff6ff;
+    --reconciliation-selected-hover: #dbeafe;
     --radius: 0.625rem;
     --sidebar: oklch(0.985 0 0);
     --sidebar-foreground: oklch(0.145 0 0);
@@ -64,6 +76,16 @@
     --chart-3: oklch(0.546 0.245 262.881);
     --chart-4: oklch(0.488 0.243 264.376);
     --chart-5: oklch(0.424 0.199 265.638);
+    --chart-6: oklch(0.72 0.19 165);
+    --chart-7: oklch(0.6 0.22 25);
+    --chart-8: oklch(0.45 0.2 265);
+    --chart-revenue: oklch(0.732 0.4487 177.66);
+    --chart-expenses: oklch(0.527 0.861 1.16);
+    --reconciliation-match-bg: #1e3a5f;
+    --reconciliation-match-border: #2563eb;
+    --reconciliation-match-muted-bg: rgba(30, 58, 95, 0.4);
+    --reconciliation-selected-bg: rgba(37, 99, 235, 0.2);
+    --reconciliation-selected-hover: rgba(37, 99, 235, 0.35);
     --sidebar: oklch(0.205 0 0);
     --sidebar-foreground: oklch(0.985 0 0);
     --sidebar-primary: oklch(0.488 0.243 264.376);
@@ -85,4 +107,11 @@
   html {
     @apply font-sans;
   }
+}
+
+/* Force dialog overlay to be opaque (outside layer so it wins over utilities) */
+[data-slot="dialog-overlay"] {
+  background-color: rgba(0, 0, 0, 0.75) !important;
+  backdrop-filter: blur(4px) !important;
+  -webkit-backdrop-filter: blur(4px) !important;
 }

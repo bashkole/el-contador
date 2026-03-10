@@ -2,13 +2,18 @@ const express = require('express');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 const { pool } = require('../db/pool');
 const { extractInvoiceData } = require('../services/invoice-extraction');
 const { sendApprovalNotification } = require('../services/email');
 
 const uploadDir = path.join(__dirname, '..', 'uploads', 'expenses');
+const batchTempDir = path.join(__dirname, '..', 'uploads', 'batch-temp');
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
+}
+if (!fs.existsSync(batchTempDir)) {
+  fs.mkdirSync(batchTempDir, { recursive: true });
 }
 
 const storage = multer.diskStorage({
@@ -19,6 +24,23 @@ const storage = multer.diskStorage({
   },
 });
 const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 } });
+
+const ALLOWED_EXT = ['.pdf', '.jpg', '.jpeg', '.png', '.webp', '.gif'];
+function safeFilename(originalName) {
+  return Buffer.from(originalName || '', 'latin1').toString('utf8').replace(/[^a-zA-Z0-9._-]/g, '_');
+}
+const batchStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const dir = req.batchUploadPath || path.join(batchTempDir, 'incoming');
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
+  filename: (req, file, cb) => {
+    const idx = (req.batchFileIndex = (req.batchFileIndex || 0) + 1);
+    cb(null, `${String(idx).padStart(3, '0')}_${safeFilename(file.originalname)}`);
+  },
+});
+const batchUpload = multer({ storage: batchStorage, limits: { fileSize: 10 * 1024 * 1024 } });
 
 const router = express.Router();
 
@@ -174,6 +196,306 @@ router.get('/check-duplicate', async (req, res) => {
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
+});
+
+// --- Batch expense import ---
+function getBatchStatePath(batchId) {
+  const dir = path.join(batchTempDir, batchId);
+  return path.join(dir, 'state.json');
+}
+
+function readBatchState(batchId) {
+  const statePath = getBatchStatePath(batchId);
+  if (!fs.existsSync(statePath)) return null;
+  const raw = fs.readFileSync(statePath, 'utf8');
+  return JSON.parse(raw);
+}
+
+function writeBatchState(batchId, state) {
+  const dir = path.join(batchTempDir, batchId);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(getBatchStatePath(batchId), JSON.stringify(state, null, 0));
+}
+
+router.post('/batch/upload', (req, res, next) => {
+  req.batchId = crypto.randomUUID();
+  req.batchUploadPath = path.join(batchTempDir, req.batchId);
+  fs.mkdirSync(req.batchUploadPath, { recursive: true });
+  next();
+}, batchUpload.array('files', 50), async (req, res) => {
+  const batchId = req.batchId;
+  const files = req.files || [];
+  const allowed = files.filter(f => ALLOWED_EXT.includes(path.extname(f.originalname).toLowerCase()));
+  if (allowed.length === 0) {
+    try {
+      files.forEach(f => { try { fs.unlinkSync(f.path); } catch (_) {} });
+      fs.rmdirSync(req.batchUploadPath, { recursive: true });
+    } catch (_) {}
+    return res.status(400).json({ error: 'No supported files (PDF, JPG, PNG, WebP, GIF)' });
+  }
+
+  let apiKey, model;
+  try {
+    const settings = await pool.query('SELECT data FROM invoice_settings WHERE id = 1');
+    const data = settings.rows[0]?.data || {};
+    apiKey = data.geminiApiKey || null;
+    model = data.geminiModel || null;
+  } catch (_) {}
+
+  const items = [];
+  for (let i = 0; i < allowed.length; i++) {
+    const file = allowed[i];
+    let data;
+    try {
+      data = await extractInvoiceData(file.path, { apiKey, model });
+    } catch (err) {
+      data = {
+        vendor: 'Unknown',
+        date: new Date().toISOString().slice(0, 10),
+        netAmount: 0,
+        vatAmount: 0,
+        vatRate: 21,
+        invoiceNumber: null,
+        description: null,
+      };
+    }
+    const vendor = (data.vendor || 'Unknown').trim();
+    const date = data.date || new Date().toISOString().slice(0, 10);
+    const netAmount = Number(data.netAmount) || 0;
+    const vatAmount = Number(data.vatAmount) || 0;
+    const vatRate = data.vatRate != null ? Number(data.vatRate) : 21;
+    const total = netAmount + vatAmount;
+    const invoiceNumber = (data.invoiceNumber || '').trim() || null;
+    const notes = (data.description || '').trim() || '';
+    items.push({
+      index: i,
+      fileName: file.originalname,
+      storedFileName: path.basename(file.path),
+      vendor,
+      date,
+      vatRate,
+      netAmount,
+      vatAmount,
+      total,
+      invoiceNumber,
+      notes,
+    });
+  }
+
+  writeBatchState(batchId, { items, supplierMappings: {} });
+  res.json({ batchId, items });
+});
+
+router.post('/batch/suppliers', async (req, res) => {
+  const { batchId, mappings } = req.body || {};
+  if (!batchId || !Array.isArray(mappings)) {
+    return res.status(400).json({ error: 'batchId and mappings array required' });
+  }
+  const state = readBatchState(batchId);
+  if (!state) return res.status(404).json({ error: 'Batch not found or expired' });
+
+  const supplierMappings = { ...state.supplierMappings };
+  for (const m of mappings) {
+    const vendor = (m.vendor || '').trim();
+    if (!vendor) continue;
+    if (m.supplierId) {
+      const r = await pool.query('SELECT id FROM suppliers WHERE id = $1', [m.supplierId]);
+      if (r.rows.length > 0) supplierMappings[vendor] = { supplierId: m.supplierId };
+    } else if (m.newSupplier && m.newSupplier.name) {
+      const name = (m.newSupplier.name || '').trim();
+      const categoryId = m.newSupplier.categoryId || null;
+      const ins = await pool.query(
+        `INSERT INTO suppliers (name, category_id) VALUES ($1, $2) RETURNING id`,
+        [name, categoryId]
+      );
+      supplierMappings[vendor] = { supplierId: ins.rows[0].id, categoryId };
+    }
+  }
+  state.supplierMappings = supplierMappings;
+  writeBatchState(batchId, state);
+  res.json({ ok: true });
+});
+
+router.get('/batch/preview', async (req, res) => {
+  const batchId = req.query.batchId;
+  if (!batchId) return res.status(400).json({ error: 'batchId required' });
+  const state = readBatchState(batchId);
+  if (!state) return res.status(404).json({ error: 'Batch not found or expired' });
+
+  const preview = [];
+  for (const item of state.items) {
+    const mapping = state.supplierMappings[item.vendor];
+    let supplierId = null;
+    let categoryId = null;
+    let categoryName = 'Other';
+    if (mapping && mapping.supplierId) {
+      supplierId = mapping.supplierId;
+      if (mapping.categoryId) {
+        categoryId = mapping.categoryId;
+        const cat = await pool.query('SELECT name FROM expense_categories WHERE id = $1', [categoryId]);
+        if (cat.rows.length > 0) categoryName = cat.rows[0].name;
+      } else {
+        const sup = await pool.query('SELECT category_id FROM suppliers WHERE id = $1', [supplierId]);
+        if (sup.rows[0] && sup.rows[0].category_id) {
+          categoryId = sup.rows[0].category_id;
+          const cat = await pool.query('SELECT name FROM expense_categories WHERE id = $1', [categoryId]);
+          if (cat.rows.length > 0) categoryName = cat.rows[0].name;
+        }
+      }
+    }
+    preview.push({
+      index: item.index,
+      fileName: item.fileName,
+      vendor: item.vendor,
+      date: item.date,
+      vatRate: item.vatRate,
+      categoryName,
+      categoryId,
+      total: item.total,
+      netAmount: item.netAmount,
+      vatAmount: item.vatAmount,
+      invoiceNumber: item.invoiceNumber,
+      notes: item.notes,
+      supplierId,
+      storedFileName: item.storedFileName,
+    });
+  }
+  res.json({ items: preview });
+});
+
+router.post('/batch/import', async (req, res) => {
+  const { batchId, selectedIndexes } = req.body || {};
+  if (!batchId || !Array.isArray(selectedIndexes)) {
+    return res.status(400).json({ error: 'batchId and selectedIndexes array required' });
+  }
+  const state = readBatchState(batchId);
+  if (!state) return res.status(404).json({ error: 'Batch not found or expired' });
+
+  const indexSet = new Set(selectedIndexes);
+  const toImport = state.items.filter(it => indexSet.has(it.index));
+  const batchDir = path.join(batchTempDir, batchId);
+  const createdBy = req.session?.userId || null;
+
+  let approvalStatus = 'none';
+  let approvalSettingsR;
+  try {
+    approvalSettingsR = await pool.query('SELECT enabled, approvers FROM approval_settings WHERE id = 1');
+  } catch (_) { approvalSettingsR = { rows: [] }; }
+  const approvalRow = approvalSettingsR.rows[0];
+  const approvalEnabled = approvalRow && !!approvalRow.enabled;
+  let userRole = 'user';
+  let userHierarchyLevel = 1;
+  if (createdBy) {
+    const userR = await pool.query('SELECT role, hierarchy_level FROM users WHERE id = $1', [createdBy]);
+    if (userR.rows.length > 0) {
+      userRole = userR.rows[0].role || 'user';
+      userHierarchyLevel = userR.rows[0].hierarchy_level != null ? userR.rows[0].hierarchy_level : 1;
+    }
+  }
+  const needsApproval = approvalEnabled && userRole !== 'admin' && userHierarchyLevel > 0;
+
+  const categoryIdOtherR = await pool.query("SELECT id FROM expense_categories WHERE name = 'Other' LIMIT 1");
+  const categoryIdOther = categoryIdOtherR.rows[0] ? categoryIdOtherR.rows[0].id : null;
+
+  const created = [];
+  for (const item of toImport) {
+    const mapping = state.supplierMappings[item.vendor];
+    let supplierId = null;
+    let categoryId = categoryIdOther;
+    let categoryName = 'Other';
+    if (mapping && mapping.supplierId) {
+      supplierId = mapping.supplierId;
+      if (mapping.categoryId) {
+        categoryId = mapping.categoryId;
+        const cat = await pool.query('SELECT name FROM expense_categories WHERE id = $1', [categoryId]);
+        if (cat.rows.length > 0) categoryName = cat.rows[0].name;
+      } else {
+        const sup = await pool.query('SELECT category_id FROM suppliers WHERE id = $1', [supplierId]);
+        if (sup.rows[0] && sup.rows[0].category_id) {
+          categoryId = sup.rows[0].category_id;
+          const cat = await pool.query('SELECT name FROM expense_categories WHERE id = $1', [categoryId]);
+          if (cat.rows.length > 0) categoryName = cat.rows[0].name;
+        }
+      }
+    }
+
+    const dup = await checkDuplicateInvoiceNumber(item.invoiceNumber, supplierId);
+    if (dup.sameSupplierDuplicate) continue;
+
+    const storedPath = path.join(batchDir, item.storedFileName);
+    if (!fs.existsSync(storedPath)) continue;
+    const storedFilename = `${Date.now()}_${safeFilename(item.fileName)}`;
+    const destPath = path.join(uploadDir, storedFilename);
+    fs.copyFileSync(storedPath, destPath);
+
+    const status = needsApproval && userHierarchyLevel > 0 ? 'pending' : 'none';
+    const r = await pool.query(
+      `INSERT INTO expenses (date, vendor, category, category_id, amount, vat, vat_rate, notes, file_name, file_path, supplier_id, invoice_number, created_by, approval_status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+       RETURNING id`,
+      [
+        item.date,
+        item.vendor,
+        categoryName,
+        categoryId,
+        item.netAmount,
+        item.vatAmount,
+        item.vatRate,
+        item.notes || '',
+        item.fileName,
+        storedFilename,
+        supplierId,
+        item.invoiceNumber,
+        createdBy,
+        status,
+      ]
+    );
+    created.push(r.rows[0].id);
+
+    if (status === 'pending') {
+      const approversList = approvalRow && approvalRow.approvers ? (Array.isArray(approvalRow.approvers) ? approvalRow.approvers : []) : [];
+      const levelsOrdered = [1, 0];
+      const requiredLevels = levelsOrdered.slice(0, userHierarchyLevel);
+      const levelToApprover = {};
+      for (const a of approversList) {
+        const uid = a.userId || a.user_id;
+        const lvl = typeof a.level === 'number' ? a.level : parseInt(a.level, 10);
+        if (uid != null && !levelToApprover.hasOwnProperty(lvl)) levelToApprover[lvl] = uid;
+      }
+      for (const level of requiredLevels) {
+        const approverUserId = levelToApprover[level];
+        if (approverUserId) {
+          await pool.query(
+            `INSERT INTO expense_approvals (expense_id, approver_level, approver_user_id, status)
+             VALUES ($1, $2, $3, 'pending')`,
+            [r.rows[0].id, level, approverUserId]
+          );
+        }
+      }
+      const firstApprover = await pool.query(
+        `SELECT u.email FROM expense_approvals ea JOIN users u ON ea.approver_user_id = u.id
+         WHERE ea.expense_id = $1 AND ea.status = 'pending' ORDER BY ea.approver_level DESC LIMIT 1`,
+        [r.rows[0].id]
+      );
+      if (firstApprover.rows.length > 0) {
+        sendApprovalNotification(firstApprover.rows[0].email, {
+          id: r.rows[0].id,
+          vendor: item.vendor,
+          date: item.date,
+          amount: item.netAmount,
+          category: categoryName,
+        });
+      }
+    }
+  }
+
+  try {
+    fs.rmSync(batchDir, { recursive: true });
+  } catch (err) {
+    console.error('Batch temp cleanup failed:', err);
+  }
+
+  res.json({ created: created.length, ids: created });
 });
 
 router.post('/', upload.single('file'), async (req, res) => {
@@ -571,8 +893,12 @@ router.get('/:id/file-info', async (req, res) => {
 // Extract invoice data using Gemini AI
 router.post('/extract', upload.single('file'), async (req, res) => {
   const file = req.file;
-  
+
   if (!file) {
+    console.warn('Invoice extract 400: no file uploaded', {
+      path: req.originalUrl,
+      method: req.method,
+    });
     return res.status(400).json({ error: 'No file uploaded' });
   }
 
@@ -580,6 +906,13 @@ router.post('/extract', upload.single('file'), async (req, res) => {
   const allowedExts = ['.pdf', '.jpg', '.jpeg', '.png', '.webp', '.gif'];
   const ext = path.extname(file.originalname).toLowerCase();
   if (!allowedExts.includes(ext)) {
+    console.warn('Invoice extract 400: invalid file type', {
+      name: file.originalname,
+      mime: file.mimetype,
+      size: file.size,
+      ext,
+      path: req.originalUrl,
+    });
     // Clean up the uploaded file
     try {
       fs.unlinkSync(file.path);
@@ -596,7 +929,7 @@ router.post('/extract', upload.single('file'), async (req, res) => {
       model = data.geminiModel || null;
     } catch (_) { /* use env fallback */ }
     const extractedData = await extractInvoiceData(file.path, { apiKey, model });
-    
+
     // Clean up the temporary file
     try {
       fs.unlinkSync(file.path);
@@ -604,20 +937,34 @@ router.post('/extract', upload.single('file'), async (req, res) => {
       console.error('Failed to clean up temp file:', e);
     }
 
+    console.info('Invoice extract 200: success', {
+      name: file.originalname,
+      mime: file.mimetype,
+      size: file.size,
+      path: req.originalUrl,
+    });
+
     res.json({
       success: true,
-      data: extractedData
+      data: extractedData,
     });
   } catch (error) {
     // Clean up the temporary file on error
     try {
       fs.unlinkSync(file.path);
     } catch (e) { /* ignore */ }
-    
-    console.error('Invoice extraction failed:', error);
-    res.status(500).json({ 
+
+    console.error('Invoice extraction failed:', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      name: file.originalname,
+      mime: file.mimetype,
+      size: file.size,
+      path: req.originalUrl,
+    });
+    res.status(500).json({
       error: 'Failed to extract invoice data',
-      message: error.message 
+      message: error instanceof Error ? error.message : 'Unknown error',
     });
   }
 });

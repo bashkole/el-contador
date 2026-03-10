@@ -7,6 +7,9 @@ import Dashboard from './pages/Dashboard';
 import Expenses from './pages/Expenses';
 import Sales from './pages/Sales';
 import Bank from './pages/Bank';
+import Reconciliation from './pages/Reconciliation';
+import Contacts from './pages/Contacts';
+import Settings from './pages/Settings';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -29,7 +32,9 @@ function App() {
               <Route path="expenses" element={<Expenses />} />
               <Route path="sales" element={<Sales />} />
               <Route path="bank" element={<Bank />} />
-              <Route path="settings" element={<div>Settings Page (WIP)</div>} />
+              <Route path="reconciliation" element={<Reconciliation />} />
+              <Route path="contacts" element={<Contacts />} />
+              <Route path="settings" element={<Settings />} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

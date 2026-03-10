@@ -4,6 +4,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>El Contador – Log in</title>
+  <script>
+    (function() {
+      fetch('/api/public/company-name').then(function(r) { return r.json(); })
+        .then(function(d) { if (d && d.companyName) document.title = d.companyName; })
+        .catch(function() {});
+    })();
+  </script>
   <style>
     :root {
       --bg: #f4f7fb;
@@ -29,7 +36,7 @@
       width: 100%;
       max-width: 360px;
       background: var(--panel);
-      border: 1px solid var(--line);
+      border: 2px solid var(--line);
       border-radius: 14px;
       padding: 28px;
     }

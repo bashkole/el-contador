@@ -87,8 +87,17 @@ CREATE TABLE IF NOT EXISTS sales (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
--- Migration: Add customer_id column if table exists without it
-ALTER TABLE sales ADD COLUMN IF NOT EXISTS customer_id uuid REFERENCES customers(id) ON DELETE SET NULL;
+-- Integration settings: single row for dynamic Stripe/Paddle credentials
+CREATE TABLE IF NOT EXISTS integration_settings (
+  id int PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+  data jsonb NOT NULL DEFAULT '{}'
+);
+INSERT INTO integration_settings (id, data) VALUES (1, '{}'::jsonb)
+ON CONFLICT (id) DO NOTHING;
+
+-- Migration: Add external sync tracking columns to sales if they don't exist
+ALTER TABLE sales ADD COLUMN IF NOT EXISTS external_id text UNIQUE;
+ALTER TABLE sales ADD COLUMN IF NOT EXISTS source text;
 
 -- Migration: Add file columns to sales if they don't exist
 ALTER TABLE sales ADD COLUMN IF NOT EXISTS file_name text;
@@ -249,3 +258,31 @@ CREATE TABLE IF NOT EXISTS approval_settings (
 );
 INSERT INTO approval_settings (id, enabled, approvers) VALUES (1, false, '[]')
 ON CONFLICT (id) DO NOTHING;
+
+-- Contact account numbers (for bank/ledger reference)
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS account_number text;
+ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS account_number text;
+
+-- Payees table (people/entities we pay: freelancers, refund recipients, etc.)
+CREATE TABLE IF NOT EXISTS payees (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name text NOT NULL,
+  email text,
+  address text,
+  phone text,
+  vat_number text,
+  company_number text,
+  account_number text,
+  notes text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_payees_name ON payees(name);
+
+-- Backfill bank_transaction_id on expenses that were matched via single-expense match
+-- (reconciliation_ref_type = 'expense') so status shows as Paid on the Expenses page
+UPDATE expenses e
+SET bank_transaction_id = bt.id
+FROM bank_transactions bt
+WHERE bt.reconciliation_ref_type = 'expense' AND bt.reconciliation_ref_id = e.id
+  AND e.bank_transaction_id IS NULL AND e.reconciled = true;

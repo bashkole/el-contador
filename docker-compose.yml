@@ -1,5 +1,5 @@
 # Compose file format 3.8 for compatibility with docker-compose (v1) and docker compose (v2)
-version: "3.8"
+#version: "3.8"
 
 services:
   postgres:

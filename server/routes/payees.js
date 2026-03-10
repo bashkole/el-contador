@@ -19,56 +19,52 @@ function mapRow(row) {
   };
 }
 
-// Get all customers
+// Get all payees
 router.get('/', async (req, res) => {
   const r = await pool.query(
-    'SELECT id, name, email, address, phone, vat_number, company_number, account_number, notes, created_at, updated_at FROM customers ORDER BY name ASC'
+    'SELECT id, name, email, address, phone, vat_number, company_number, account_number, notes, created_at, updated_at FROM payees ORDER BY name ASC'
   );
   res.json(r.rows.map(mapRow));
 });
 
-// Get a single customer
+// Get a single payee
 router.get('/:id', async (req, res) => {
   const r = await pool.query(
-    'SELECT id, name, email, address, phone, vat_number, company_number, account_number, notes, created_at, updated_at FROM customers WHERE id = $1',
+    'SELECT id, name, email, address, phone, vat_number, company_number, account_number, notes, created_at, updated_at FROM payees WHERE id = $1',
     [req.params.id]
   );
   if (r.rows.length === 0) {
-    return res.status(404).json({ error: 'Customer not found' });
+    return res.status(404).json({ error: 'Payee not found' });
   }
   res.json(mapRow(r.rows[0]));
 });
 
-// Create a new customer
+// Create a new payee
 router.post('/', async (req, res) => {
   const { name, email, address, phone, vatNumber, companyNumber, accountNumber, notes } = req.body || {};
   if (!name || !name.trim()) {
     return res.status(400).json({ error: 'Name is required' });
   }
 
-  try {
-    const r = await pool.query(
-      `INSERT INTO customers (name, email, address, phone, vat_number, company_number, account_number, notes)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-       RETURNING id, name, email, address, phone, vat_number, company_number, account_number, notes, created_at, updated_at`,
-      [
-        name.trim(),
-        (email || '').trim() || null,
-        (address || '').trim() || null,
-        (phone || '').trim() || null,
-        (vatNumber || '').trim() || null,
-        (companyNumber || '').trim() || null,
-        (accountNumber || '').trim() || null,
-        (notes || '').trim() || null,
-      ]
-    );
-    res.status(201).json(mapRow(r.rows[0]));
-  } catch (err) {
-    throw err;
-  }
+  const r = await pool.query(
+    `INSERT INTO payees (name, email, address, phone, vat_number, company_number, account_number, notes)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+     RETURNING id, name, email, address, phone, vat_number, company_number, account_number, notes, created_at, updated_at`,
+    [
+      name.trim(),
+      (email || '').trim() || null,
+      (address || '').trim() || null,
+      (phone || '').trim() || null,
+      (vatNumber || '').trim() || null,
+      (companyNumber || '').trim() || null,
+      (accountNumber || '').trim() || null,
+      (notes || '').trim() || null,
+    ]
+  );
+  res.status(201).json(mapRow(r.rows[0]));
 });
 
-// Update a customer
+// Update a payee
 router.put('/:id', async (req, res) => {
   const id = req.params.id;
   const { name, email, address, phone, vatNumber, companyNumber, accountNumber, notes } = req.body || {};
@@ -122,22 +118,22 @@ router.put('/:id', async (req, res) => {
   values.push(id);
 
   const r = await pool.query(
-    `UPDATE customers SET ${updates.join(', ')} WHERE id = $${pos} RETURNING id, name, email, address, phone, vat_number, company_number, account_number, notes, created_at, updated_at`,
+    `UPDATE payees SET ${updates.join(', ')} WHERE id = $${pos} RETURNING id, name, email, address, phone, vat_number, company_number, account_number, notes, created_at, updated_at`,
     values
   );
 
   if (r.rows.length === 0) {
-    return res.status(404).json({ error: 'Customer not found' });
+    return res.status(404).json({ error: 'Payee not found' });
   }
 
   res.json(mapRow(r.rows[0]));
 });
 
-// Delete a customer
+// Delete a payee
 router.delete('/:id', async (req, res) => {
-  const r = await pool.query('DELETE FROM customers WHERE id = $1 RETURNING id', [req.params.id]);
+  const r = await pool.query('DELETE FROM payees WHERE id = $1 RETURNING id', [req.params.id]);
   if (r.rows.length === 0) {
-    return res.status(404).json({ error: 'Customer not found' });
+    return res.status(404).json({ error: 'Payee not found' });
   }
   res.json({ success: true });
 });

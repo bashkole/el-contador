@@ -4,6 +4,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>El Contador Admin</title>
+  <script>
+    (function() {
+      fetch('/api/public/company-name').then(function(r) { return r.json(); })
+        .then(function(d) { if (d && d.companyName) document.title = d.companyName; })
+        .catch(function() {});
+    })();
+  </script>
   <style>
     body { font-family: Arial, sans-serif; max-width: 560px; margin: 40px auto; padding: 20px; }
     .msg { padding: 16px; background: #fff7df; border: 1px solid #f0d996; border-radius: 8px; margin-top: 16px; }

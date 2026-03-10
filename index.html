@@ -4,6 +4,14 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>El Contador</title>
+  <script>
+    (function() {
+      fetch('/api/public/company-name').then(function(r) { return r.json(); })
+        .then(function(d) { if (d && d.companyName) document.title = d.companyName; })
+        .catch(function() {});
+    })();
+  </script>
+  <link rel="icon" href="/api/public/favicon" type="image/png">
   <link rel="icon" href="favicon.png" type="image/png">
   <style>
     :root {

@@ -334,6 +334,7 @@
       <button class="tab-btn" data-tab="suppliers">Suppliers</button>
       <button class="tab-btn" data-tab="vat-reports">VAT Reports</button>
       <button class="tab-btn" data-tab="settings">Invoice settings</button>
+      <button class="tab-btn" data-tab="integrations">Integrations</button>
       <button class="tab-btn" data-tab="admin">Admin</button>
     </nav>
 
@@ -892,6 +893,63 @@
           </div>
           <div class="actions" style="margin-top: 12px;">
             <button type="submit" class="btn-primary">Save invoice settings</button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <section id="tab-integrations" class="tab-content hidden">
+      <div class="panel">
+        <h2>Integrations</h2>
+        <p class="small">Connect external services like Stripe and Paddle to automatically sync transactions.</p>
+        
+        <form id="integrationsForm">
+          <div class="panel" style="margin-bottom: 16px; border: 1px solid var(--border);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+              <h3 style="margin: 0;">Stripe</h3>
+              <label class="toggle-switch">
+                <input type="checkbox" id="intStripeEnabled">
+                <span class="slider"></span>
+              </label>
+            </div>
+            <p class="small">Sync Stripe payments as sales invoices.</p>
+            <div class="grid" style="margin-top: 12px;">
+              <div class="field">
+                <label for="intStripeSecretKey">Secret Key</label>
+                <input id="intStripeSecretKey" type="password" placeholder="sk_live_...">
+              </div>
+              <div class="field">
+                <label for="intStripeWebhookSecret">Webhook Secret</label>
+                <input id="intStripeWebhookSecret" type="password" placeholder="whsec_...">
+              </div>
+            </div>
+            <p class="small" style="margin-top: 8px;">Webhook URL: <code>/api/webhooks/stripe</code></p>
+          </div>
+
+          <div class="panel" style="margin-bottom: 16px; border: 1px solid var(--border);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+              <h3 style="margin: 0;">Paddle</h3>
+              <label class="toggle-switch">
+                <input type="checkbox" id="intPaddleEnabled">
+                <span class="slider"></span>
+              </label>
+            </div>
+            <p class="small">Sync Paddle transactions as sales invoices.</p>
+            <div class="grid" style="margin-top: 12px;">
+              <div class="field">
+                <label for="intPaddleApiKey">API Key</label>
+                <input id="intPaddleApiKey" type="password" placeholder="Key...">
+              </div>
+              <div class="field">
+                <label for="intPaddleWebhookSecret">Webhook Secret</label>
+                <input id="intPaddleWebhookSecret" type="password" placeholder="Secret...">
+              </div>
+            </div>
+            <p class="small" style="margin-top: 8px;">Webhook URL: <code>/api/webhooks/paddle</code></p>
+          </div>
+
+          <div class="actions" style="margin-top: 12px;">
+            <button type="submit" class="btn-primary">Save integrations</button>
           </div>
         </form>
       </div>
@@ -2899,6 +2957,7 @@
       document.getElementById("tab-" + tabName).classList.remove("hidden");
       if (tabName === "dashboard") loadDashboard();
       if (tabName === "settings") loadInvoiceConfig();
+      if (tabName === "integrations") loadIntegrationsConfig();
       if (tabName === "suppliers") updateSupplierCategorySelects();
       if (tabName === "admin") loadAdminData();
       if (tabName === "tasks") loadTasks();
@@ -3697,6 +3756,51 @@
       const h1 = document.getElementById("mainHeading");
       if (h1) h1.textContent = title;
     }
+
+    // Integrations Settings
+    async function loadIntegrationsConfig() {
+      try {
+        const res = await fetch("/api/integrations", { credentials: "same-origin" });
+        const data = await res.json();
+        
+        document.getElementById("intStripeEnabled").checked = !!data.stripeEnabled;
+        document.getElementById("intStripeSecretKey").value = data.stripeSecretKey || "";
+        document.getElementById("intStripeWebhookSecret").value = data.stripeWebhookSecret || "";
+        
+        document.getElementById("intPaddleEnabled").checked = !!data.paddleEnabled;
+        document.getElementById("intPaddleApiKey").value = data.paddleApiKey || "";
+        document.getElementById("intPaddleWebhookSecret").value = data.paddleWebhookSecret || "";
+      } catch (err) {
+        console.error("Failed to load integration settings", err);
+      }
+    }
+
+    document.getElementById("integrationsForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      
+      const payload = {
+        stripeEnabled: document.getElementById("intStripeEnabled").checked,
+        stripeSecretKey: document.getElementById("intStripeSecretKey").value.trim(),
+        stripeWebhookSecret: document.getElementById("intStripeWebhookSecret").value.trim(),
+        paddleEnabled: document.getElementById("intPaddleEnabled").checked,
+        paddleApiKey: document.getElementById("intPaddleApiKey").value.trim(),
+        paddleWebhookSecret: document.getElementById("intPaddleWebhookSecret").value.trim()
+      };
+      
+      try {
+        const res = await fetch("/api/integrations", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          credentials: "same-origin",
+          body: JSON.stringify(payload)
+        });
+        
+        if (!res.ok) throw new Error("Failed to save integration settings");
+        alert("Integration settings saved!");
+      } catch (err) {
+        alert(err.message);
+      }
+    });
 
     async function loadInvoiceConfig() {
       try {

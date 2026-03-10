@@ -3,6 +3,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { pool } = require('../db/pool');
+const { buildInvoicePdf } = require('../services/invoice-pdf');
 
 const uploadDir = path.join(__dirname, '..', 'uploads', 'invoices');
 if (!fs.existsSync(uploadDir)) {
@@ -41,7 +42,7 @@ function mapRow(row) {
     lines: Array.isArray(row.lines) ? row.lines : [],
     voided: Boolean(row.voided),
     voidedAt: row.voided_at || null,
-    reconciled: row.reconciled,
+    reconciled: Boolean(row.reconciled),
     reconciledAt: row.reconciled_at,
     fileName: row.file_name,
     createdAt: row.created_at,
@@ -245,6 +246,22 @@ router.get('/:id/file', async (req, res) => {
   res.sendFile(path.resolve(filePath), {
     headers: { 'Content-Disposition': `${disposition}; filename="${r.rows[0].file_name || 'file'}"` }
   });
+});
+
+// Generated PDF invoice (for preview and download)
+router.get('/:id/pdf', async (req, res) => {
+  const id = req.params.id;
+  const attachment = req.query.download === '1';
+  try {
+    const sale = await pool.query('SELECT id FROM sales WHERE id = $1', [id]);
+    if (sale.rows.length === 0) return res.status(404).json({ error: 'Sale not found' });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', attachment ? `attachment; filename="invoice-${id}.pdf"` : 'inline');
+    await buildInvoicePdf(id, res);
+  } catch (err) {
+    console.error('Invoice PDF error:', err);
+    if (!res.headersSent) res.status(500).json({ error: 'Failed to generate PDF' });
+  }
 });
 
 // Get file info and mime type for preview

@@ -34,6 +34,15 @@ Then set in `.env`:
 
 Point your subdomain at this app (reverse proxy to `http://127.0.0.1:3080` or your ADMIN_PORT). See the root README for an nginx example. First login with the email/password from step 2.
 
+### 413 Payload Too Large on file upload
+
+If users get **413** when uploading receipt images (e.g. on mobile), the request is being rejected by the **web server** (Apache/nginx) before it reaches Node, so the backend will not log the request.
+
+- **Apache**: In the vhost or `.htaccess`, set `LimitRequestBody` high enough (e.g. `LimitRequestBody 10485760` for 10MB). Default is often 1MB or less.
+- **nginx**: In server/location, set `client_max_body_size 10M;` (or higher). Default is 1M.
+
+The app allows uploads up to 10MB (expenses/sales); ensure the proxy limit is at least that.
+
 ## API (all under `/api`, require session except auth)
 
 - `POST /api/auth/login` – body: `{ email, password }`

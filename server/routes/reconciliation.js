@@ -5,6 +5,79 @@ const router = express.Router();
 
 const RECON_TOLERANCE = 0.5;
 
+/** Get suggested auto-matches: open bank tx paired with open expense/sale by amount (within tolerance) */
+router.get('/suggestions', async (req, res) => {
+  try {
+    const openTx = await pool.query(
+      `SELECT id, date, type, amount, description FROM bank_transactions WHERE reconciled = false ORDER BY date DESC`
+    );
+    const openExpenses = await pool.query(
+      `SELECT id, date, vendor, amount, vat FROM expenses WHERE reconciled = false AND bank_transaction_id IS NULL ORDER BY date DESC`
+    );
+    const openSales = await pool.query(
+      `SELECT id, issue_date, customer, total FROM sales WHERE reconciled = false AND voided = false ORDER BY issue_date DESC`
+    );
+
+    const suggestions = [];
+    const usedTx = new Set();
+    const usedExpense = new Set();
+    const usedSale = new Set();
+
+    for (const tx of openTx.rows) {
+      if (usedTx.has(tx.id)) continue;
+      const txAmount = Number(tx.amount);
+
+      if (tx.type === 'out') {
+        for (const ex of openExpenses.rows) {
+          if (usedExpense.has(ex.id)) continue;
+          const itemTotal = Number(ex.amount || 0) + Number(ex.vat || 0);
+          if (Math.abs(txAmount - itemTotal) <= RECON_TOLERANCE) {
+            usedTx.add(tx.id);
+            usedExpense.add(ex.id);
+            suggestions.push({
+              bankTransactionId: tx.id,
+              bankDate: tx.date,
+              bankType: tx.type,
+              bankAmount: txAmount,
+              bankDescription: tx.description,
+              targetId: ex.id,
+              targetType: 'expense',
+              targetLabel: ex.vendor,
+              targetAmount: itemTotal,
+            });
+            break;
+          }
+        }
+      } else {
+        for (const sale of openSales.rows) {
+          if (usedSale.has(sale.id)) continue;
+          const total = Number(sale.total);
+          if (Math.abs(txAmount - total) <= RECON_TOLERANCE) {
+            usedTx.add(tx.id);
+            usedSale.add(sale.id);
+            suggestions.push({
+              bankTransactionId: tx.id,
+              bankDate: tx.date,
+              bankType: tx.type,
+              bankAmount: txAmount,
+              bankDescription: tx.description,
+              targetId: sale.id,
+              targetType: 'sale',
+              targetLabel: sale.customer,
+              targetAmount: total,
+            });
+            break;
+          }
+        }
+      }
+    }
+
+    res.json({ suggestions });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 router.post('/match', async (req, res) => {
   const { bankTransactionId, targetId, targetType } = req.body || {};
   if (!bankTransactionId || !targetId || !targetType || !['expense', 'sale'].includes(targetType)) {
@@ -43,11 +116,17 @@ router.post('/match', async (req, res) => {
       `UPDATE bank_transactions SET reconciled = true, reconciliation_ref_type = $1, reconciliation_ref_id = $2, reconciled_at = $3, adjustment_amount = $4 WHERE id = $5`,
       [targetType, targetId, now, adjustmentAmount, bankTransactionId]
     );
-    const table = targetType === 'expense' ? 'expenses' : 'sales';
-    await client.query(
-      `UPDATE ${table} SET reconciled = true, reconciled_at = $1 WHERE id = $2`,
-      [now, targetId]
-    );
+    if (targetType === 'expense') {
+      await client.query(
+        `UPDATE expenses SET reconciled = true, reconciled_at = $1, bank_transaction_id = $2 WHERE id = $3`,
+        [now, bankTransactionId, targetId]
+      );
+    } else {
+      await client.query(
+        `UPDATE sales SET reconciled = true, reconciled_at = $1 WHERE id = $2`,
+        [now, targetId]
+      );
+    }
     await client.query('COMMIT');
     res.json({ ok: true });
   } catch (e) {
