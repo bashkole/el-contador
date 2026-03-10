@@ -46,16 +46,17 @@ router.get('/quarterly', async (req, res) => {
     [from, to]
   );
 
-  // Expense breakdown by category with VAT
+  // Expense breakdown by account/category with VAT
   const categoryBreakdown = await pool.query(
-    `SELECT ec.name as category,
+    `SELECT COALESCE(a.name, ec.name, 'Uncategorized') as category,
             COALESCE(SUM(e.amount), 0) as net_amount,
             COALESCE(SUM(e.vat), 0) as vat_amount,
             COUNT(*) as count
      FROM expenses e
+     LEFT JOIN accounts a ON e.account_id = a.id
      LEFT JOIN expense_categories ec ON e.category_id = ec.id
      WHERE e.date >= $1 AND e.date <= $2
-     GROUP BY ec.name
+     GROUP BY COALESCE(a.name, ec.name, 'Uncategorized')
      ORDER BY vat_amount DESC`,
     [from, to]
   );
@@ -183,16 +184,17 @@ router.get('/expense-summary', async (req, res) => {
 
   const result = await pool.query(
     `SELECT 
-       COALESCE(ec.name, e.category, 'Uncategorized') as category,
-       COALESCE(ec.account_code, '0000') as account_code,
+       COALESCE(a.name, ec.name, e.category, 'Uncategorized') as category,
+       COALESCE(a.code::text, ec.account_code, '0000') as account_code,
        COALESCE(SUM(e.amount), 0) as net_amount,
        COALESCE(SUM(e.vat), 0) as vat_amount,
        COALESCE(SUM(e.amount + e.vat), 0) as total_amount,
        COUNT(*) as transaction_count
      FROM expenses e
+     LEFT JOIN accounts a ON e.account_id = a.id
      LEFT JOIN expense_categories ec ON e.category_id = ec.id
      WHERE e.date >= $1 AND e.date <= $2
-     GROUP BY COALESCE(ec.name, e.category, 'Uncategorized'), COALESCE(ec.account_code, '0000')
+     GROUP BY COALESCE(a.name, ec.name, e.category, 'Uncategorized'), COALESCE(a.code::text, ec.account_code, '0000')
      ORDER BY total_amount DESC`,
     [from, to]
   );

@@ -21,6 +21,9 @@ export type Payee = ContactBase;
 export type Supplier = ContactBase & {
   categoryId?: string | null;
   categoryName?: string | null;
+  accountId?: string | null;
+  accountCode?: number | null;
+  accountName?: string | null;
 };
 
 // Customers

@@ -33,13 +33,21 @@ router.get('/logo', (req, res) => {
 
 router.get('/favicon', (req, res) => {
   const faviconPath = path.join(logoDir, 'favicon.png');
-  if (!fs.existsSync(faviconPath)) return res.status(404).end();
-  res.sendFile(path.resolve(faviconPath), {
+  const resolvedPath = path.resolve(faviconPath);
+  const exists = fs.existsSync(faviconPath);
+  const ts = new Date().toISOString();
+  process.stderr.write(`[public] GET /favicon logoDir=${logoDir} faviconPath=${faviconPath} resolved=${resolvedPath} exists=${exists}\n`);
+  if (!exists) {
+    process.stderr.write(`[public] GET /favicon -> 404 (favicon.png not found)\n`);
+    return res.status(404).end();
+  }
+  res.sendFile(resolvedPath, {
     headers: {
       'Cache-Control': 'public, max-age=86400',
       'Content-Type': 'image/png',
     },
   });
+  process.stderr.write(`[public] GET /favicon -> 200 sent\n`);
 });
 
 module.exports = router;

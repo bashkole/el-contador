@@ -40,7 +40,7 @@ You do **not** need to install PostgreSQL on the host or create a database/user 
    Or without the CLI:
 
    ```bash
-   docker compose -f node_modules/el-contador/docker-compose.yml --env-file .env up -d
+   docker compose --project-directory node_modules/el-contador -f node_modules/el-contador/docker-compose.yml --env-file .env up -d
    ```
 
 4. Open the admin UI at `http://localhost:3080` (or the port in `ADMIN_PORT`). Log in with the admin user: **INIT_ADMIN_EMAIL** from `.env` (default `admin@example.com`), and **INIT_ADMIN_PASSWORD** or **DB_PASSWORD** if not set.
@@ -91,14 +91,14 @@ To get the latest app version:
 
 ```bash
 npm update el-contador
-docker compose -f node_modules/el-contador/docker-compose.yml --env-file .env up -d --build
+docker compose --project-directory node_modules/el-contador -f node_modules/el-contador/docker-compose.yml --env-file .env up -d --build
 ```
 
 If `npm update` says "up to date" but a newer version is on npm (`npm view el-contador version`), install the latest explicitly then rebuild:
 
 ```bash
 npm install el-contador@latest
-docker compose -f node_modules/el-contador/docker-compose.yml --env-file .env up -d --build
+docker compose --project-directory node_modules/el-contador -f node_modules/el-contador/docker-compose.yml --env-file .env up -d --build
 ```
 
 Or use the CLI:
@@ -118,7 +118,7 @@ After a successful update, the backend log will show `el-contador-server@X.Y.Z` 
 If `npx el-contador` fails (e.g. "unknown shorthand flag: 'f'"), your host may have Docker but not the Compose plugin in the expected form. Install **docker-compose** (standalone) or run Compose manually from the same directory as `.env`:
 
 ```bash
-docker-compose -f node_modules/el-contador/docker-compose.yml --env-file .env up -d
+docker-compose --project-directory node_modules/el-contador -f node_modules/el-contador/docker-compose.yml --env-file .env up -d
 ```
 
 On Ubuntu: `sudo apt install docker-compose-plugin` (V2) or the standalone `docker-compose` package.
@@ -127,11 +127,10 @@ On Ubuntu: `sudo apt install docker-compose-plugin` (V2) or the standalone `dock
 
 1. Create an npm account at [npmjs.com/signup](https://www.npmjs.com/signup) if needed.
 2. Log in from the package root: `npm login` (username, password, email; OTP if 2FA is enabled).
-3. Build the frontend so the package ships a pre-built `frontend/dist`: run `npm run build` in the `frontend/` directory, then ensure `frontend/dist` is listed in `package.json` `files`.
+3. Update `repository.url` in `package.json` to your real Git URL before publishing.
 4. From this directory (the package root): `npm publish --access public`.  
-   `--access public` is required for unscoped packages.
-5. Update `repository.url` in `package.json` to your real Git URL before publishing.
-6. For later releases: bump `version` in both **package.json** (root) and **server/package.json** so the backend log shows the correct release (e.g. `el-contador-server@1.0.7`), then build frontend and `npm publish` from the package root.
+   `--access public` is required for unscoped packages. The package includes the full `frontend/` source; the Docker image builds it at build time.
+5. For later releases: bump `version` in both **package.json** (root) and **server/package.json** so the backend log shows the correct release (e.g. `el-contador-server@1.0.7`), then `npm publish` from the package root.
 
 ## License
 

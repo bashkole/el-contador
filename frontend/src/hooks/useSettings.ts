@@ -23,6 +23,21 @@ export function useSaveInvoiceConfig() {
   });
 }
 
+export function useUploadLogo() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      const { data } = await api.post<{ logoPath: string }>('/invoice-config/logo', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      return data;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['invoice-config'] }),
+  });
+}
+
 // Integrations
 export function useIntegrationsSettings() {
   return useQuery({
@@ -134,5 +149,74 @@ export function useDeleteExpenseCategory() {
       await api.delete(`/expense-categories/${id}`);
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['expense-categories'] }),
+  });
+}
+
+// Chart of accounts: account groups and accounts
+export function useAccountGroups() {
+  return useQuery({
+    queryKey: ['account-groups'],
+    queryFn: async () => {
+      const { data } = await api.get('/account-groups');
+      return data;
+    },
+  });
+}
+
+export function useAccounts(params?: { groupId?: string; type?: string }) {
+  return useQuery({
+    queryKey: ['accounts', params?.groupId, params?.type],
+    queryFn: async () => {
+      const sp = new URLSearchParams();
+      if (params?.groupId) sp.set('group_id', params.groupId);
+      if (params?.type) sp.set('type', params.type);
+      const { data } = await api.get('/accounts' + (sp.toString() ? '?' + sp.toString() : ''));
+      return data;
+    },
+  });
+}
+
+export function useAccountsAll() {
+  return useQuery({
+    queryKey: ['accounts', 'all'],
+    queryFn: async () => {
+      const { data } = await api.get('/accounts/all');
+      return data;
+    },
+  });
+}
+
+export function useSaveAccount() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (account: any) => {
+      if (account.id) {
+        const { data } = await api.put(`/accounts/${account.id}`, account);
+        return data;
+      } else {
+        const { data } = await api.post('/accounts', account);
+        return data;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['accounts'] });
+      queryClient.invalidateQueries({ queryKey: ['account-groups'] });
+      queryClient.invalidateQueries({ queryKey: ['expense-categories'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+    },
+  });
+}
+
+export function useDeleteAccount() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      await api.delete(`/accounts/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['accounts'] });
+      queryClient.invalidateQueries({ queryKey: ['account-groups'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+    },
   });
 }

@@ -71,6 +71,12 @@ async function init() {
     await pool.query("ALTER TABLE sales ADD COLUMN IF NOT EXISTS source text");
     await pool.query("ALTER TABLE bank_transactions ADD COLUMN IF NOT EXISTS account_type text");
     await pool.query("ALTER TABLE bank_transactions ADD COLUMN IF NOT EXISTS account_note text");
+    await pool.query("ALTER TABLE bank_transactions ADD COLUMN IF NOT EXISTS account_id uuid REFERENCES accounts(id) ON DELETE RESTRICT");
+    await pool.query("UPDATE bank_transactions SET account_id = (SELECT id FROM accounts WHERE code = 100 LIMIT 1) WHERE account_id IS NULL");
+    try {
+      await pool.query("ALTER TABLE bank_transactions ALTER COLUMN account_id SET NOT NULL");
+    } catch (e) { /* may already be set or no rows */ }
+    await pool.query("CREATE INDEX IF NOT EXISTS idx_bank_transactions_account ON bank_transactions(account_id)");
     await pool.query(`
       DO $$
       BEGIN
@@ -78,7 +84,18 @@ async function init() {
           ALTER TABLE bank_transactions DROP CONSTRAINT bank_transactions_reconciliation_ref_type_check;
         END IF;
         ALTER TABLE bank_transactions ADD CONSTRAINT bank_transactions_reconciliation_ref_type_check
-          CHECK (reconciliation_ref_type IN ('expense', 'sale', 'expenses', 'account'));
+          CHECK (reconciliation_ref_type IN ('expense', 'sale', 'expenses', 'account', 'transfer'));
+      EXCEPTION WHEN duplicate_object THEN NULL;
+      END $$;
+    `);
+    await pool.query(`
+      DO $$
+      BEGIN
+        IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'journal_entries_source_ref_type_check') THEN
+          ALTER TABLE journal_entries DROP CONSTRAINT journal_entries_source_ref_type_check;
+        END IF;
+        ALTER TABLE journal_entries ADD CONSTRAINT journal_entries_source_ref_type_check
+          CHECK (source_ref_type IN ('expense', 'sale', 'bank', 'manual', 'transfer'));
       EXCEPTION WHEN duplicate_object THEN NULL;
       END $$;
     `);

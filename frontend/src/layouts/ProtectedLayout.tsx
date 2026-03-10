@@ -63,11 +63,12 @@ export default function ProtectedLayout() {
 
   const sidebarContent = (
     <>
-      <div className="p-4 flex items-center gap-2 min-h-[3rem]">
+      <div className="p-4 flex items-center min-h-[7rem]">
         {logoUrl ? (
-          <img src={logoUrl} alt="" className="h-8 w-auto object-contain flex-shrink-0" />
+          <div className="rounded-lg bg-white p-2 w-full h-20 flex items-center justify-center">
+            <img src={logoUrl} alt="" className="max-w-full max-h-full w-auto h-auto object-contain" />
+          </div>
         ) : null}
-        <h1 className="text-xl font-bold text-white truncate">{companyName}</h1>
       </div>
       <nav className="flex-1 px-2 py-4 space-y-1">
         {navLinks}
@@ -106,9 +107,10 @@ export default function ProtectedLayout() {
           </SheetContent>
         </Sheet>
         {logoUrl ? (
-          <img src={logoUrl} alt="" className="h-7 w-auto object-contain flex-shrink-0" />
+          <div className="rounded-lg bg-white p-2 h-10 w-24 flex items-center justify-center shrink-0">
+            <img src={logoUrl} alt="" className="max-w-full max-h-full w-auto h-auto object-contain" />
+          </div>
         ) : null}
-        <h1 className="text-lg font-bold truncate">{companyName}</h1>
       </header>
 
       {/* Desktop: sidebar */}

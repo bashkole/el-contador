@@ -106,14 +106,16 @@ router.post('/logo', logoUpload.single('file'), async (req, res) => {
     'INSERT INTO invoice_settings (id, data) VALUES (1, $1::jsonb) ON CONFLICT (id) DO UPDATE SET data = $1::jsonb',
     [JSON.stringify(existing)]
   );
+  const faviconPath = path.join(logoDir, 'favicon.png');
+  process.stderr.write(`[invoice-config] POST /logo success logoPath=${logoPath} logoFile=${req.file.path} faviconTarget=${faviconPath}\n`);
   try {
-    const faviconPath = path.join(logoDir, 'favicon.png');
     await sharp(req.file.path)
       .resize(32, 32)
       .png()
       .toFile(faviconPath);
+    process.stderr.write(`[invoice-config] Favicon generated: ${faviconPath}\n`);
   } catch (err) {
-    process.stderr.write(`[invoice-config] Favicon generation failed: ${err.message}\n`);
+    process.stderr.write(`[invoice-config] Favicon generation failed: ${err.message} stack=${err.stack}\n`);
   }
   res.json({ logoPath });
 });

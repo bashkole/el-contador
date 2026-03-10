@@ -16,6 +16,9 @@ function mapRow(row) {
     notes: row.notes || '',
     categoryId: row.category_id || null,
     categoryName: row.category_name || null,
+    accountId: row.account_id || null,
+    accountCode: row.account_code != null ? Number(row.account_code) : null,
+    accountName: row.account_name || null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -25,10 +28,11 @@ function mapRow(row) {
 router.get('/', async (req, res) => {
   try {
     const r = await pool.query(
-      `SELECT s.id, s.name, s.email, s.address, s.phone, s.vat_number, s.company_number, s.account_number, s.notes, s.category_id, s.created_at, s.updated_at,
-              c.name AS category_name
+      `SELECT s.id, s.name, s.email, s.address, s.phone, s.vat_number, s.company_number, s.account_number, s.notes, s.category_id, s.account_id, s.created_at, s.updated_at,
+              c.name AS category_name, a.code AS account_code, a.name AS account_name
        FROM suppliers s
        LEFT JOIN expense_categories c ON c.id = s.category_id
+       LEFT JOIN accounts a ON a.id = s.account_id
        ORDER BY s.name ASC`
     );
     return res.json(r.rows.map(mapRow));
@@ -37,7 +41,7 @@ router.get('/', async (req, res) => {
       const r = await pool.query(
         'SELECT id, name, email, address, phone, vat_number, company_number, account_number, notes, created_at, updated_at FROM suppliers ORDER BY name ASC'
       );
-      return res.json(r.rows.map(row => mapRow({ ...row, category_id: null, category_name: null })));
+      return res.json(r.rows.map(row => mapRow({ ...row, category_id: null, category_name: null, account_id: null, account_code: null, account_name: null })));
     }
     throw err;
   }
@@ -47,10 +51,11 @@ router.get('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const r = await pool.query(
-      `SELECT s.id, s.name, s.email, s.address, s.phone, s.vat_number, s.company_number, s.account_number, s.notes, s.category_id, s.created_at, s.updated_at,
-              c.name AS category_name
+      `SELECT s.id, s.name, s.email, s.address, s.phone, s.vat_number, s.company_number, s.account_number, s.notes, s.category_id, s.account_id, s.created_at, s.updated_at,
+              c.name AS category_name, a.code AS account_code, a.name AS account_name
        FROM suppliers s
        LEFT JOIN expense_categories c ON c.id = s.category_id
+       LEFT JOIN accounts a ON a.id = s.account_id
        WHERE s.id = $1`,
       [req.params.id]
     );
@@ -75,16 +80,16 @@ router.get('/:id', async (req, res) => {
 
 // Create a new supplier
 router.post('/', async (req, res) => {
-  const { name, email, address, phone, vatNumber, companyNumber, accountNumber, notes, categoryId } = req.body || {};
+  const { name, email, address, phone, vatNumber, companyNumber, accountNumber, notes, categoryId, accountId } = req.body || {};
   if (!name || !name.trim()) {
     return res.status(400).json({ error: 'Name is required' });
   }
 
   try {
     let r = await pool.query(
-      `INSERT INTO suppliers (name, email, address, phone, vat_number, company_number, account_number, notes, category_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-       RETURNING id, name, email, address, phone, vat_number, company_number, account_number, notes, category_id, created_at, updated_at`,
+      `INSERT INTO suppliers (name, email, address, phone, vat_number, company_number, account_number, notes, category_id, account_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+       RETURNING id, name, email, address, phone, vat_number, company_number, account_number, notes, category_id, account_id, created_at, updated_at`,
       [
         name.trim(),
         (email || '').trim() || null,
@@ -95,6 +100,7 @@ router.post('/', async (req, res) => {
         (accountNumber || '').trim() || null,
         (notes || '').trim() || null,
         categoryId || null,
+        accountId || null,
       ]
     );
     let row = r.rows[0];
@@ -103,6 +109,14 @@ router.post('/', async (req, res) => {
       row.category_name = cat.rows[0]?.name || null;
     } else {
       row.category_name = null;
+    }
+    if (row.account_id) {
+      const acc = await pool.query('SELECT code, name FROM accounts WHERE id = $1', [row.account_id]);
+      row.account_code = acc.rows[0]?.code ?? null;
+      row.account_name = acc.rows[0]?.name ?? null;
+    } else {
+      row.account_code = null;
+      row.account_name = null;
     }
     res.status(201).json(mapRow(row));
   } catch (err) {
@@ -133,7 +147,7 @@ router.post('/', async (req, res) => {
 // Update a supplier
 router.put('/:id', async (req, res) => {
   const id = req.params.id;
-  const { name, email, address, phone, vatNumber, companyNumber, accountNumber, notes, categoryId } = req.body || {};
+  const { name, email, address, phone, vatNumber, companyNumber, accountNumber, notes, categoryId, accountId } = req.body || {};
 
   const updates = [];
   const values = [];
@@ -178,6 +192,10 @@ router.put('/:id', async (req, res) => {
     updates.push(`category_id = $${pos++}`);
     values.push(categoryId || null);
   }
+  if (accountId !== undefined) {
+    updates.push(`account_id = $${pos++}`);
+    values.push(accountId || null);
+  }
 
   if (updates.length === 0) {
     return res.status(400).json({ error: 'No fields to update' });
@@ -190,7 +208,7 @@ router.put('/:id', async (req, res) => {
   try {
     const r = await pool.query(
       `UPDATE suppliers SET ${updates.join(', ')} WHERE id = $${pos}
-       RETURNING id, name, email, address, phone, vat_number, company_number, account_number, notes, category_id, created_at, updated_at`,
+       RETURNING id, name, email, address, phone, vat_number, company_number, account_number, notes, category_id, account_id, created_at, updated_at`,
       values
     );
     if (r.rows.length === 0) {
@@ -202,6 +220,14 @@ router.put('/:id', async (req, res) => {
       row.category_name = cat.rows[0]?.name || null;
     } else {
       row.category_name = null;
+    }
+    if (row.account_id) {
+      const acc = await pool.query('SELECT code, name FROM accounts WHERE id = $1', [row.account_id]);
+      row.account_code = acc.rows[0]?.code ?? null;
+      row.account_name = acc.rows[0]?.name ?? null;
+    } else {
+      row.account_code = null;
+      row.account_name = null;
     }
     return res.json(mapRow(row));
   } catch (err) {

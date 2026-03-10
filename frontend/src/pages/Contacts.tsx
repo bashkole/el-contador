@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useCustomers, useCreateCustomer, useUpdateCustomer, useDeleteCustomer, type Customer } from '../hooks/useContacts';
 import { useSuppliers, useCreateSupplier, useUpdateSupplier, useDeleteSupplier, type Supplier } from '../hooks/useContacts';
 import { usePayees, useCreatePayee, useUpdatePayee, useDeletePayee, type Payee } from '../hooks/useContacts';
-import { useExpenseCategories as useExpenseCategoriesHook } from '../hooks/useExpenses';
+import { useExpenseCategories as useExpenseCategoriesHook, useExpenseAccounts } from '../hooks/useExpenses';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -32,6 +32,7 @@ export default function Contacts() {
   const [editing, setEditing] = useState<Customer | Supplier | Payee | null>(null);
   const [form, setForm] = useState(emptyContact);
   const [supplierCategoryId, setSupplierCategoryId] = useState<string | null>(null);
+  const [supplierAccountId, setSupplierAccountId] = useState<string | null>(null);
 
   const { data: customers, isLoading: loadingCustomers } = useCustomers();
   const createCustomer = useCreateCustomer();
@@ -40,6 +41,8 @@ export default function Contacts() {
 
   const { data: suppliers, isLoading: loadingSuppliers } = useSuppliers();
   const { data: categories } = useExpenseCategoriesHook();
+  const { data: expenseAccounts } = useExpenseAccounts();
+  const useAccountForSupplier = expenseAccounts && expenseAccounts.length > 0;
   const createSupplier = useCreateSupplier();
   const updateSupplier = useUpdateSupplier();
   const deleteSupplier = useDeleteSupplier();
@@ -62,9 +65,11 @@ export default function Contacts() {
         notes: editing.notes ?? '',
       });
       setSupplierCategoryId((editing as Supplier).categoryId ?? null);
+      setSupplierAccountId((editing as Supplier).accountId ?? (editing as Supplier).categoryId ?? null);
     } else {
       setForm(emptyContact);
       setSupplierCategoryId(null);
+      setSupplierAccountId(null);
     }
   }, [editing]);
 
@@ -72,6 +77,7 @@ export default function Contacts() {
     setEditing(null);
     setForm(emptyContact);
     setSupplierCategoryId(null);
+    setSupplierAccountId(null);
     setDialogOpen(true);
   };
 
@@ -95,7 +101,9 @@ export default function Contacts() {
           await createCustomer.mutateAsync(form);
         }
       } else if (activeTab === 'supplier') {
-        const body = { ...form, categoryId: supplierCategoryId || undefined };
+        const body = useAccountForSupplier
+          ? { ...form, accountId: supplierAccountId || undefined }
+          : { ...form, categoryId: supplierCategoryId || undefined };
         if (editing?.id) {
           await updateSupplier.mutateAsync({ id: editing.id, ...body });
         } else {
@@ -228,7 +236,7 @@ export default function Contacts() {
                         <TableRow key={row.id}>
                           <TableCell className="font-medium">{row.name}</TableCell>
                           <TableCell>{row.accountNumber || '-'}</TableCell>
-                          <TableCell>{(row as Supplier).categoryName || '-'}</TableCell>
+                          <TableCell>{(row as Supplier).accountName || (row as Supplier).categoryName || '-'}</TableCell>
                           <TableCell>{row.email || '-'}</TableCell>
                           <TableCell>{row.phone || '-'}</TableCell>
                           <TableCell>
@@ -348,20 +356,34 @@ export default function Contacts() {
             </div>
             {activeTab === 'supplier' && (
               <div className="space-y-2">
-                <label className="text-sm font-medium">Default category</label>
-                <Select value={supplierCategoryId ?? ''} onValueChange={(v) => setSupplierCategoryId(v || null)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Optional" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">None</SelectItem>
-                    {(categories ?? []).sort((a: { sortOrder?: number }, b: { sortOrder?: number }) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)).map((cat: { id: string; name: string }) => (
-                      <SelectItem key={cat.id} value={cat.id}>
-                        {cat.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <label className="text-sm font-medium">{useAccountForSupplier ? 'Default account' : 'Default category'}</label>
+                {useAccountForSupplier ? (
+                  <Select value={supplierAccountId ?? ''} onValueChange={(v) => setSupplierAccountId(v || null)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Optional" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">None</SelectItem>
+                      {(expenseAccounts ?? []).sort((a: any, b: any) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || (a.code - b.code)).map((acc: any) => (
+                        <SelectItem key={acc.id} value={acc.id}>{acc.code} - {acc.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Select value={supplierCategoryId ?? ''} onValueChange={(v) => setSupplierCategoryId(v || null)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Optional" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">None</SelectItem>
+                      {(categories ?? []).sort((a: { sortOrder?: number }, b: { sortOrder?: number }) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)).map((cat: { id: string; name: string }) => (
+                        <SelectItem key={cat.id} value={cat.id}>
+                          {cat.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
             )}
             <div className="space-y-2">

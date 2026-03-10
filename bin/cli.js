@@ -35,11 +35,14 @@ function getDockerComposeCmd() {
   process.exit(1);
 }
 
-// Run compose
+// Run compose. Use --project-directory so the build context is the package root (where
+// docker-compose.yml lives), not the user's cwd (e.g. admin/). Otherwise COPY server/
+// and COPY frontend/ would look in the wrong place when running from a sibling of the app.
 function runCompose(subargs) {
   const composeCmd = getDockerComposeCmd();
+  const projectDir = path.resolve(pkgRoot);
   const envPart = hasEnv ? ' --env-file ' + shQuote(envFile) : '';
-  const cmd = composeCmd + ' -f ' + shQuote(composePath) + envPart + ' ' + subargs.join(' ');
+  const cmd = composeCmd + ' --project-directory ' + shQuote(projectDir) + ' -f ' + shQuote(composePath) + envPart + ' ' + subargs.join(' ');
   
   const r = spawnSync(
     process.platform === 'win32' ? 'cmd' : 'sh',

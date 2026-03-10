@@ -2,6 +2,7 @@ const express = require('express');
 const stripe = require('stripe');
 const { Environment, Paddle } = require('@paddle/paddle-node-sdk');
 const { pool } = require('../db/pool');
+const { postSale } = require('../services/journal-posting');
 
 const router = express.Router();
 
@@ -44,8 +45,7 @@ router.post('/stripe', express.raw({ type: 'application/json' }), async (req, re
       const amount = charge.amount / 100; 
       const date = new Date(charge.created * 1000).toISOString().split('T')[0];
       
-      // Upsert into sales table
-      await pool.query(`
+      const r = await pool.query(`
         INSERT INTO sales (
           invoice_no, customer, issue_date, due_date, subtotal, vat, total, 
           external_id, source, description, lines
@@ -53,6 +53,7 @@ router.post('/stripe', express.raw({ type: 'application/json' }), async (req, re
           $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
         )
         ON CONFLICT (external_id) DO NOTHING
+        RETURNING id
       `, [
         `STRIPE-${transactionId}`, // invoice_no
         'Stripe Customer',         // customer
@@ -66,7 +67,13 @@ router.post('/stripe', express.raw({ type: 'application/json' }), async (req, re
         charge.description || 'Stripe Payment',
         JSON.stringify([{ description: 'Stripe Payment', amount: amount, quantity: 1 }])
       ]);
-      
+      if (r.rows.length > 0) {
+        try {
+          await postSale(r.rows[0].id);
+        } catch (err) {
+          process.stderr.write(`[journal] postSale(${r.rows[0].id}) failed: ${err.message}\n`);
+        }
+      }
       console.log(`Successfully synced Stripe transaction ${transactionId}`);
     }
 
@@ -119,7 +126,7 @@ router.post('/paddle', express.json(), async (req, res) => {
       const amount = parseFloat(transaction.details?.totals?.grand_total || transaction.billing_details?.payment_total || 0);
       const date = transaction.created_at.split('T')[0];
       
-      await pool.query(`
+      const r = await pool.query(`
         INSERT INTO sales (
           invoice_no, customer, issue_date, due_date, subtotal, vat, total, 
           external_id, source, description, lines
@@ -127,6 +134,7 @@ router.post('/paddle', express.json(), async (req, res) => {
           $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
         )
         ON CONFLICT (external_id) DO NOTHING
+        RETURNING id
       `, [
         `PADDLE-${transactionId}`, // invoice_no
         'Paddle Customer',         // customer
@@ -140,7 +148,13 @@ router.post('/paddle', express.json(), async (req, res) => {
         'Paddle Transaction',
         JSON.stringify([{ description: 'Paddle Transaction', amount: amount, quantity: 1 }])
       ]);
-      
+      if (r.rows.length > 0) {
+        try {
+          await postSale(r.rows[0].id);
+        } catch (err) {
+          process.stderr.write(`[journal] postSale(${r.rows[0].id}) failed: ${err.message}\n`);
+        }
+      }
       console.log(`Successfully synced Paddle transaction ${transactionId}`);
     }
     

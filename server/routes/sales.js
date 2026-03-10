@@ -4,6 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const { pool } = require('../db/pool');
 const { buildInvoicePdf } = require('../services/invoice-pdf');
+const { postSale } = require('../services/journal-posting');
 
 const uploadDir = path.join(__dirname, '..', 'uploads', 'invoices');
 if (!fs.existsSync(uploadDir)) {
@@ -121,6 +122,11 @@ router.post('/', upload.single('file'), async (req, res) => {
       ]
     );
     const row = r.rows[0];
+    try {
+      await postSale(row.id);
+    } catch (err) {
+      process.stderr.write(`[journal] postSale(${row.id}) failed: ${err.message}\n`);
+    }
     res.status(201).json(mapRow(row));
   } catch (err) {
     if (err.code === '23505') {

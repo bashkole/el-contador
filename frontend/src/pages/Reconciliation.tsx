@@ -28,9 +28,10 @@ type Suggestion = {
   bankAmount: number;
   bankDescription: string;
   targetId: string;
-  targetType: 'expense' | 'sale';
+  targetType: 'expense' | 'sale' | 'transfer';
   targetLabel: string;
   targetAmount: number;
+  pairedBankTransactionId?: string;
 };
 
 function Pagination({
@@ -215,7 +216,30 @@ export default function Reconciliation() {
   };
 
   const applySuggestion = (s: Suggestion) => {
-    applyMatch(s.bankTransactionId, s.targetId, s.targetType);
+    if (s.targetType === 'transfer') {
+      applyMatchTransfer(s.bankTransactionId, s.pairedBankTransactionId ?? s.targetId);
+    } else {
+      applyMatch(s.bankTransactionId, s.targetId, s.targetType as 'expense' | 'sale');
+    }
+  };
+
+  const applyMatchTransfer = async (bankTransactionId: string, pairedBankTransactionId: string) => {
+    try {
+      await api.post('/reconciliation/match-transfer', { bankTransactionId, pairedBankTransactionId });
+      setSuggestions((prev) =>
+        prev.filter(
+          (s) =>
+            !(s.targetType === 'transfer' && s.bankTransactionId === bankTransactionId && (s.pairedBankTransactionId === pairedBankTransactionId || s.targetId === pairedBankTransactionId))
+        )
+      );
+      setSelectedTx(null);
+      setSelectedExpenseIds([]);
+      setSelectedSaleId(null);
+      invalidate();
+    } catch (error: any) {
+      console.error(error);
+      alert('Failed to match transfer: ' + (error.response?.data?.error || error.message));
+    }
   };
 
   const applyMatchExpenses = async (bankTransactionId: string, expenseIds: string[]) => {
@@ -395,7 +419,7 @@ export default function Reconciliation() {
                     <TableCell className="w-24 text-right whitespace-nowrap">€{s.targetAmount.toFixed(2)}</TableCell>
                     <TableCell className="w-[120px]">
                       <Button size="sm" onClick={() => applySuggestion(s)}>
-                        Confirm match
+                        {s.targetType === 'transfer' ? 'Confirm transfer' : 'Confirm match'}
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -420,13 +444,14 @@ export default function Reconciliation() {
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-24">Date</TableHead>
+                      <TableHead className="w-20">Account</TableHead>
                       <TableHead className="min-w-0">Description</TableHead>
                       <TableHead className="w-24 text-right">Amount</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredBankTxs.length === 0 ? (
-                      <TableRow><TableCell colSpan={3} className="text-center py-4 text-muted-foreground">{openBankTxs.length === 0 ? 'No open bank transactions.' : 'No matches for search.'}</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={4} className="text-center py-4 text-muted-foreground">{openBankTxs.length === 0 ? 'No open bank transactions.' : 'No matches for search.'}</TableCell></TableRow>
                     ) : (
                       openBankPageSlice.map((tx: any) => (
                         <TableRow 
@@ -435,6 +460,9 @@ export default function Reconciliation() {
                           onClick={() => { setSelectedTx(tx); setSelectedExpenseIds([]); setSelectedSaleId(null); }}
                         >
                           <TableCell className="w-24 whitespace-nowrap">{formatYyMmDd(tx.date)}</TableCell>
+                          <TableCell className="w-20 truncate" title={tx.accountName || (tx.accountCode != null ? String(tx.accountCode) : undefined)}>
+                            {tx.accountCode != null ? String(tx.accountCode) : '\u2014'}
+                          </TableCell>
                           <TableCell className="min-w-0 truncate" title={tx.description || tx.reference || undefined}>
                             {truncate(tx.description || tx.reference)}
                           </TableCell>
@@ -601,17 +629,25 @@ export default function Reconciliation() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {pairedPageSlice.map((tx: any) => (
-                <TableRow key={tx.id}>
-                  <TableCell className="w-24 whitespace-nowrap">{formatYyMmDd(tx.date)}</TableCell>
-                  <TableCell className="min-w-0 truncate" title={tx.description || undefined}>{truncate(tx.description)}</TableCell>
-                  <TableCell className="w-24 capitalize">{tx.reconciliationRefType || '\u2014'}</TableCell>
-                  <TableCell className="w-24 text-right whitespace-nowrap">€{Number(tx.amount).toFixed(2)}</TableCell>
-                  <TableCell className="w-[200px]">
-                    <Button variant="outline" size="sm" onClick={() => handleUnmatch(tx.id)}>Unmatch</Button>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {pairedPageSlice.map((tx: any) => {
+                const pairedTx = tx.reconciliationRefType === 'transfer' && tx.reconciliationRefId
+                  ? bankList.find((t: any) => String(t.id) === String(tx.reconciliationRefId))
+                  : null;
+                const typeLabel = tx.reconciliationRefType === 'transfer' && pairedTx
+                  ? `Transfer to/from ${pairedTx.accountName || pairedTx.accountCode || 'other account'}`
+                  : (tx.reconciliationRefType || '\u2014');
+                return (
+                  <TableRow key={tx.id}>
+                    <TableCell className="w-24 whitespace-nowrap">{formatYyMmDd(tx.date)}</TableCell>
+                    <TableCell className="min-w-0 truncate" title={tx.description || undefined}>{truncate(tx.description)}</TableCell>
+                    <TableCell className="w-24 capitalize">{typeLabel}</TableCell>
+                    <TableCell className="w-24 text-right whitespace-nowrap">€{Number(tx.amount).toFixed(2)}</TableCell>
+                    <TableCell className="w-[200px]">
+                      <Button variant="outline" size="sm" onClick={() => handleUnmatch(tx.id)}>Unmatch</Button>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
               {filteredPairedTxs.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={5} className="text-center py-4 text-muted-foreground">{pairedTxs.length === 0 ? 'No paired transactions yet.' : 'No matches for search.'}</TableCell>

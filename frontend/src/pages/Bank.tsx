@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useBankTransactions, useBankImportPreview, useConfirmBankImport, useUpdateBankTransaction, useDeleteBankTransaction, type BankImportPreviewRow } from '../hooks/useBank';
+import { useAccountsAll } from '../hooks/useSettings';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -61,25 +62,40 @@ function SortableTh({
 
 type ReviewRow = BankImportPreviewRow & { selected: boolean };
 
+const ASSET_CODE_MIN = 100;
+const ASSET_CODE_MAX = 199;
+
 export default function Bank() {
   const { data: transactions, isLoading } = useBankTransactions();
+  const { data: allAccounts } = useAccountsAll();
   const previewMutation = useBankImportPreview();
   const confirmImportMutation = useConfirmBankImport();
   const updateMutation = useUpdateBankTransaction();
   const deleteMutation = useDeleteBankTransaction();
 
+  const assetAccounts = (allAccounts ?? []).filter(
+    (a: { code: number }) => a.code >= ASSET_CODE_MIN && a.code <= ASSET_CODE_MAX
+  ).sort((a: { code: number }, b: { code: number }) => a.code - b.code);
+  const defaultBankAccountId = assetAccounts.length > 0 ? assetAccounts[0].id : null;
+
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('all');
+  const [filterAccountId, setFilterAccountId] = useState<string>('all');
   const [page, setPage] = useState(0);
   const [editingTx, setEditingTx] = useState<any>(null);
   const [deletingTx, setDeletingTx] = useState<any>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState({ date: '', type: 'out' as 'in' | 'out', amount: '', reference: '', description: '' });
+  const [editForm, setEditForm] = useState({ date: '', type: 'out' as 'in' | 'out', amount: '', reference: '', description: '', accountId: '' as string });
   const [importReviewOpen, setImportReviewOpen] = useState(false);
   const [reviewRows, setReviewRows] = useState<ReviewRow[]>([]);
+  const [importAccountId, setImportAccountId] = useState<string | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<SortKey>('date');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
+
+  useEffect(() => {
+    if (defaultBankAccountId && importAccountId === null) setImportAccountId(defaultBankAccountId);
+  }, [defaultBankAccountId, importAccountId]);
 
   const handleSort = (key: SortKey) => {
     if (sortBy === key) {
@@ -98,6 +114,7 @@ export default function Bank() {
       amount: tx.amount != null ? String(Math.abs(Number(tx.amount))) : '',
       reference: tx.reference ?? '',
       description: tx.description ?? '',
+      accountId: tx.accountId ?? '',
     });
   };
 
@@ -111,6 +128,7 @@ export default function Bank() {
       amount,
       reference: editForm.reference,
       description: editForm.description,
+      accountId: editForm.accountId || undefined,
     });
     setEditingTx(null);
   };
@@ -164,7 +182,7 @@ export default function Bank() {
     if (toImport.length === 0) return;
     setImportError(null);
     try {
-      await confirmImportMutation.mutateAsync(toImport);
+      await confirmImportMutation.mutateAsync({ rows: toImport, accountId: importAccountId || defaultBankAccountId });
       setImportReviewOpen(false);
       setReviewRows([]);
     } catch (err: any) {
@@ -178,12 +196,11 @@ export default function Bank() {
     const amountStr = String(Math.abs(Number(tx.amount)) ?? '');
     const term = searchTerm.toLowerCase().trim();
     const matchesSearch = !term || desc.includes(term) || ref.includes(term) || amountStr.includes(term.replace(',', '.'));
-    
+    if (filterAccountId !== 'all' && tx.accountId !== filterAccountId) return false;
     if (filterType === 'unreconciled' && tx.reconciled) return false;
     if (filterType === 'reconciled' && !tx.reconciled) return false;
     if (filterType === 'in' && tx.type !== 'in') return false;
     if (filterType === 'out' && tx.type !== 'out') return false;
-    
     return matchesSearch;
   });
 
@@ -258,6 +275,22 @@ export default function Bank() {
                 <SelectItem value="out">Money Out</SelectItem>
               </SelectContent>
             </Select>
+            <Select value={filterAccountId} onValueChange={(val) => setFilterAccountId(val || 'all')}>
+              <SelectTrigger className="w-[180px]">
+                <span className="truncate">
+                  {filterAccountId === 'all' ? 'All accounts' : (() => {
+                    const sel = assetAccounts.find((a: { id: string }) => a.id === filterAccountId);
+                    return sel ? `${sel.code} ${sel.name}` : 'Account...';
+                  })()}
+                </span>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All accounts</SelectItem>
+                {assetAccounts.map((a: { id: string; code: number; name: string }) => (
+                  <SelectItem key={a.id} value={a.id}>{a.code} {a.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </CardHeader>
         <CardContent>
@@ -275,6 +308,7 @@ export default function Bank() {
                   <SortableTh label="Date" sortKey="date" currentSortKey={sortBy} sortDir={sortDir} onSort={handleSort} className="w-24" />
                   <SortableTh label="Reference" sortKey="reference" currentSortKey={sortBy} sortDir={sortDir} onSort={handleSort} className="w-32" />
                   <SortableTh label="Description" sortKey="description" currentSortKey={sortBy} sortDir={sortDir} onSort={handleSort} className="w-32" />
+                  <TableHead className="w-28">Account</TableHead>
                   <SortableTh label="Amount" sortKey="amount" currentSortKey={sortBy} sortDir={sortDir} onSort={handleSort} className="w-24 text-right" />
                   <SortableTh label="Status" sortKey="status" currentSortKey={sortBy} sortDir={sortDir} onSort={handleSort} className="w-24" />
                   <TableHead className="w-[200px] whitespace-nowrap">Actions</TableHead>
@@ -283,7 +317,7 @@ export default function Bank() {
               <TableBody>
                 {totalCount === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-4 text-muted-foreground">
+                    <TableCell colSpan={7} className="text-center py-4 text-muted-foreground">
                       No transactions found.
                     </TableCell>
                   </TableRow>
@@ -296,6 +330,10 @@ export default function Bank() {
                       </TableCell>
                       <TableCell className="w-32 truncate" title={tx.description || undefined}>
                         {truncate(tx.description)}
+                      </TableCell>
+                      <TableCell className="w-28 truncate" title={tx.accountName || (tx.accountCode != null ? String(tx.accountCode) : undefined)}>
+                        {tx.accountCode != null ? `${tx.accountCode}` : '\u2014'}
+                        {tx.accountName ? ` ${truncate(tx.accountName, 12)}` : ''}
                       </TableCell>
                       <TableCell className={`w-24 text-right font-medium whitespace-nowrap ${tx.type === 'in' ? 'text-emerald-600' : 'text-slate-900'}`}>
                         {tx.type === 'in' ? '+' : '-'}€{Math.abs(Number(tx.amount)).toFixed(2)}
@@ -416,6 +454,26 @@ export default function Bank() {
                 onChange={(e) => setEditForm((f) => ({ ...f, description: e.target.value }))}
               />
             </div>
+            {assetAccounts.length > 0 && (
+              <div className="grid grid-cols-4 items-center gap-2">
+                <Label>Account</Label>
+                <Select value={editForm.accountId || defaultBankAccountId || ''} onValueChange={(v) => setEditForm((f) => ({ ...f, accountId: v }))}>
+                  <SelectTrigger className="col-span-3">
+                    <span className="truncate">
+                      {(() => {
+                        const sel = assetAccounts.find((a: { id: string }) => a.id === (editForm.accountId || defaultBankAccountId));
+                        return sel ? `${sel.code} ${sel.name}` : 'Select account...';
+                      })()}
+                    </span>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {assetAccounts.map((a: { id: string; code: number; name: string }) => (
+                      <SelectItem key={a.id} value={a.id}>{a.code} {a.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
           <DialogFooter showCloseButton>
             <Button onClick={submitEdit} disabled={updateMutation.isPending || !editForm.date || !editForm.amount}>
@@ -456,9 +514,29 @@ export default function Bank() {
           <DialogHeader>
             <DialogTitle>Review import</DialogTitle>
             <DialogDescription>
-              Uncheck rows to exclude from import. Edit any field as needed, then click Import selected.
+              Uncheck rows to exclude from import. Choose the account to import into, then click Import selected.
             </DialogDescription>
           </DialogHeader>
+          {assetAccounts.length > 0 && (
+            <div className="flex items-center gap-2 py-2 border-b">
+              <Label className="shrink-0">Import to account</Label>
+              <Select value={importAccountId || defaultBankAccountId || ''} onValueChange={(v) => setImportAccountId(v)}>
+                <SelectTrigger className="w-[280px]">
+                  <span className="truncate">
+                    {(() => {
+                      const sel = assetAccounts.find((a: { id: string }) => a.id === (importAccountId || defaultBankAccountId));
+                      return sel ? `${sel.code} ${sel.name}` : 'Select account...';
+                    })()}
+                  </span>
+                </SelectTrigger>
+                <SelectContent>
+                  {assetAccounts.map((a: { id: string; code: number; name: string }) => (
+                    <SelectItem key={a.id} value={a.id}>{a.code} {a.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           <div className="flex items-center gap-2 py-2 border-b">
             <Button variant="outline" size="sm" onClick={() => setReviewRows((prev) => prev.map((r) => ({ ...r, selected: true })))}>
               Select all

@@ -188,7 +188,7 @@ CREATE TABLE IF NOT EXISTS vat_quarterly_reports (
 
 CREATE INDEX IF NOT EXISTS idx_vat_quarterly_year_q ON vat_quarterly_reports(year, quarter);
 
--- Predefined expense categories with Dutch VAT rates
+-- Predefined expense categories with Dutch VAT rates (legacy, see account_groups/accounts for chart of accounts)
 INSERT INTO expense_categories (name, description, default_vat_rate, account_code, sort_order) VALUES
   ('Office & Software', 'Office supplies, software licenses, SaaS subscriptions', 21.00, '6000', 10),
   ('Marketing & Advertising', 'Ads, promotions, marketing campaigns', 21.00, '6100', 20),
@@ -202,6 +202,234 @@ INSERT INTO expense_categories (name, description, default_vat_rate, account_cod
   ('Training & Education', 'Courses, conferences, certifications', 21.00, '6900', 100),
   ('Other', 'Miscellaneous expenses', 21.00, '6999', 999)
 ON CONFLICT (name) DO NOTHING;
+
+-- Chart of accounts: groups (code ranges) and accounts (bookable lines)
+CREATE TABLE IF NOT EXISTS account_groups (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name text UNIQUE NOT NULL,
+  code_min integer NOT NULL,
+  code_max integer NOT NULL,
+  sort_order integer NOT NULL DEFAULT 0,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS accounts (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  account_group_id uuid NOT NULL REFERENCES account_groups(id) ON DELETE RESTRICT,
+  code integer UNIQUE NOT NULL,
+  name text NOT NULL,
+  description text,
+  default_vat_rate numeric(5,2),
+  sort_order integer NOT NULL DEFAULT 0,
+  active boolean NOT NULL DEFAULT true,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_accounts_group ON accounts(account_group_id);
+CREATE INDEX IF NOT EXISTS idx_accounts_code ON accounts(code);
+
+-- Seed account groups (100-199 Assets, 200-299 Revenue, 300-399 COGS, 400-799 Expenses, 800-999 Liabilities)
+INSERT INTO account_groups (name, code_min, code_max, sort_order) VALUES
+  ('Assets', 100, 199, 1),
+  ('Revenue/Income', 200, 299, 2),
+  ('Cost of Goods Sold', 300, 399, 3),
+  ('Expenses', 400, 799, 4),
+  ('Liabilities & Equity', 800, 999, 5)
+ON CONFLICT (name) DO NOTHING;
+
+-- Seed accounts (reference groups by name for idempotent inserts)
+INSERT INTO accounts (account_group_id, code, name, description, default_vat_rate, sort_order)
+SELECT ag.id, 100, 'Bank Account', 'General checking/savings', NULL, 10 FROM account_groups ag WHERE ag.name = 'Assets' AND ag.code_min = 100
+ON CONFLICT (code) DO NOTHING;
+INSERT INTO accounts (account_group_id, code, name, description, default_vat_rate, sort_order)
+SELECT ag.id, 120, 'Accounts Receivable', 'Money owed by customers', NULL, 20 FROM account_groups ag WHERE ag.name = 'Assets' AND ag.code_min = 100
+ON CONFLICT (code) DO NOTHING;
+INSERT INTO accounts (account_group_id, code, name, description, default_vat_rate, sort_order)
+SELECT ag.id, 130, 'Inventory', 'Value of goods for sale', NULL, 30 FROM account_groups ag WHERE ag.name = 'Assets' AND ag.code_min = 100
+ON CONFLICT (code) DO NOTHING;
+INSERT INTO accounts (account_group_id, code, name, description, default_vat_rate, sort_order)
+SELECT ag.id, 140, 'Fixed Assets', 'Equipment, vehicles, etc.', NULL, 40 FROM account_groups ag WHERE ag.name = 'Assets' AND ag.code_min = 100
+ON CONFLICT (code) DO NOTHING;
+
+INSERT INTO accounts (account_group_id, code, name, description, default_vat_rate, sort_order)
+SELECT ag.id, 200, 'Sales Revenue', 'Income from selling goods/services', NULL, 10 FROM account_groups ag WHERE ag.name = 'Revenue/Income'
+ON CONFLICT (code) DO NOTHING;
+INSERT INTO accounts (account_group_id, code, name, description, default_vat_rate, sort_order)
+SELECT ag.id, 260, 'Other Revenue', 'Non-core income', NULL, 20 FROM account_groups ag WHERE ag.name = 'Revenue/Income'
+ON CONFLICT (code) DO NOTHING;
+INSERT INTO accounts (account_group_id, code, name, description, default_vat_rate, sort_order)
+SELECT ag.id, 270, 'Interest Income', 'Interest received', NULL, 30 FROM account_groups ag WHERE ag.name = 'Revenue/Income'
+ON CONFLICT (code) DO NOTHING;
+
+INSERT INTO accounts (account_group_id, code, name, description, default_vat_rate, sort_order)
+SELECT ag.id, 310, 'Cost of Goods Sold (COGS)', 'Direct costs of producing goods', NULL, 10 FROM account_groups ag WHERE ag.name = 'Cost of Goods Sold'
+ON CONFLICT (code) DO NOTHING;
+INSERT INTO accounts (account_group_id, code, name, description, default_vat_rate, sort_order)
+SELECT ag.id, 320, 'Direct Wages', 'Wages for direct labor', NULL, 20 FROM account_groups ag WHERE ag.name = 'Cost of Goods Sold'
+ON CONFLICT (code) DO NOTHING;
+
+INSERT INTO accounts (account_group_id, code, name, description, default_vat_rate, sort_order)
+SELECT ag.id, 400, 'Advertising & Marketing', 'Ads, website costs', 21.00, 10 FROM account_groups ag WHERE ag.name = 'Expenses'
+ON CONFLICT (code) DO NOTHING;
+INSERT INTO accounts (account_group_id, code, name, description, default_vat_rate, sort_order)
+SELECT ag.id, 401, 'Audit & Accountancy Fees', 'Accountant fees, Xero subscription', 21.00, 20 FROM account_groups ag WHERE ag.name = 'Expenses'
+ON CONFLICT (code) DO NOTHING;
+INSERT INTO accounts (account_group_id, code, name, description, default_vat_rate, sort_order)
+SELECT ag.id, 404, 'Bank Fees', 'Bank charges, overdraft fees', 0.00, 30 FROM account_groups ag WHERE ag.name = 'Expenses'
+ON CONFLICT (code) DO NOTHING;
+INSERT INTO accounts (account_group_id, code, name, description, default_vat_rate, sort_order)
+SELECT ag.id, 412, 'Consulting & Accounting', 'Professional fees', 21.00, 40 FROM account_groups ag WHERE ag.name = 'Expenses'
+ON CONFLICT (code) DO NOTHING;
+INSERT INTO accounts (account_group_id, code, name, description, default_vat_rate, sort_order)
+SELECT ag.id, 425, 'Postage, Freight & Courier', 'Shipping costs', 21.00, 50 FROM account_groups ag WHERE ag.name = 'Expenses'
+ON CONFLICT (code) DO NOTHING;
+INSERT INTO accounts (account_group_id, code, name, description, default_vat_rate, sort_order)
+SELECT ag.id, 429, 'General Expenses', 'Miscellaneous expenses', 21.00, 60 FROM account_groups ag WHERE ag.name = 'Expenses'
+ON CONFLICT (code) DO NOTHING;
+INSERT INTO accounts (account_group_id, code, name, description, default_vat_rate, sort_order)
+SELECT ag.id, 433, 'Insurance', 'Business insurance', 21.00, 70 FROM account_groups ag WHERE ag.name = 'Expenses'
+ON CONFLICT (code) DO NOTHING;
+INSERT INTO accounts (account_group_id, code, name, description, default_vat_rate, sort_order)
+SELECT ag.id, 437, 'Interest Paid', 'Interest on loans', 0.00, 80 FROM account_groups ag WHERE ag.name = 'Expenses'
+ON CONFLICT (code) DO NOTHING;
+INSERT INTO accounts (account_group_id, code, name, description, default_vat_rate, sort_order)
+SELECT ag.id, 441, 'Legal Expenses', 'Solicitor fees', 21.00, 90 FROM account_groups ag WHERE ag.name = 'Expenses'
+ON CONFLICT (code) DO NOTHING;
+INSERT INTO accounts (account_group_id, code, name, description, default_vat_rate, sort_order)
+SELECT ag.id, 449, 'Motor Vehicle Expenses', 'Fuel, repairs', 21.00, 100 FROM account_groups ag WHERE ag.name = 'Expenses'
+ON CONFLICT (code) DO NOTHING;
+INSERT INTO accounts (account_group_id, code, name, description, default_vat_rate, sort_order)
+SELECT ag.id, 461, 'Printing & Stationery', 'Office supplies', 21.00, 110 FROM account_groups ag WHERE ag.name = 'Expenses'
+ON CONFLICT (code) DO NOTHING;
+INSERT INTO accounts (account_group_id, code, name, description, default_vat_rate, sort_order)
+SELECT ag.id, 477, 'Rent', 'Business premises rent', 0.00, 120 FROM account_groups ag WHERE ag.name = 'Expenses'
+ON CONFLICT (code) DO NOTHING;
+INSERT INTO accounts (account_group_id, code, name, description, default_vat_rate, sort_order)
+SELECT ag.id, 489, 'Repairs & Maintenance', 'Property or equipment repairs', 21.00, 130 FROM account_groups ag WHERE ag.name = 'Expenses'
+ON CONFLICT (code) DO NOTHING;
+
+INSERT INTO accounts (account_group_id, code, name, description, default_vat_rate, sort_order)
+SELECT ag.id, 800, 'Accounts Payable', 'Money owed to suppliers', NULL, 10 FROM account_groups ag WHERE ag.name = 'Liabilities & Equity'
+ON CONFLICT (code) DO NOTHING;
+INSERT INTO accounts (account_group_id, code, name, description, default_vat_rate, sort_order)
+SELECT ag.id, 820, 'Current Liability', 'Short-term debts', NULL, 20 FROM account_groups ag WHERE ag.name = 'Liabilities & Equity'
+ON CONFLICT (code) DO NOTHING;
+INSERT INTO accounts (account_group_id, code, name, description, default_vat_rate, sort_order)
+SELECT ag.id, 830, 'Sales Tax/VAT', 'Tax payable to tax authorities', NULL, 30 FROM account_groups ag WHERE ag.name = 'Liabilities & Equity'
+ON CONFLICT (code) DO NOTHING;
+
+-- Seed optional second asset account for multi-bank (secondary/credit card)
+INSERT INTO accounts (account_group_id, code, name, description, default_vat_rate, sort_order)
+SELECT ag.id, 101, 'Secondary Bank / Credit Card', 'Additional bank or credit card account', NULL, 15 FROM account_groups ag WHERE ag.name = 'Assets' AND ag.code_min = 100
+ON CONFLICT (code) DO NOTHING;
+
+-- Migration: Link bank_transactions to asset account (multi-bank)
+ALTER TABLE bank_transactions ADD COLUMN IF NOT EXISTS account_id uuid REFERENCES accounts(id) ON DELETE RESTRICT;
+UPDATE bank_transactions SET account_id = (SELECT id FROM accounts WHERE code = 100 LIMIT 1) WHERE account_id IS NULL;
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'bank_transactions' AND column_name = 'account_id') AND
+     (SELECT data_type FROM information_schema.columns WHERE table_name = 'bank_transactions' AND column_name = 'account_id') = 'uuid' THEN
+    ALTER TABLE bank_transactions ALTER COLUMN account_id SET NOT NULL;
+  END IF;
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
+CREATE INDEX IF NOT EXISTS idx_bank_transactions_account ON bank_transactions(account_id);
+
+-- Migration: Allow reconciliation_ref_type 'transfer' for account-to-account transfers
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'bank_transactions_reconciliation_ref_type_check') THEN
+    ALTER TABLE bank_transactions DROP CONSTRAINT bank_transactions_reconciliation_ref_type_check;
+  END IF;
+  ALTER TABLE bank_transactions ADD CONSTRAINT bank_transactions_reconciliation_ref_type_check
+    CHECK (reconciliation_ref_type IN ('expense', 'sale', 'expenses', 'account', 'transfer'));
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+-- Journal: post transactions for reporting (separate from bank reconciliation)
+CREATE TABLE IF NOT EXISTS journal_entries (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  date date NOT NULL,
+  description text,
+  source_ref_type text NOT NULL CHECK (source_ref_type IN ('expense', 'sale', 'bank', 'manual', 'transfer')),
+  source_ref_id uuid,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS journal_lines (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  journal_entry_id uuid NOT NULL REFERENCES journal_entries(id) ON DELETE CASCADE,
+  account_id uuid NOT NULL REFERENCES accounts(id) ON DELETE RESTRICT,
+  debit_amount numeric(12,2) NOT NULL DEFAULT 0,
+  credit_amount numeric(12,2) NOT NULL DEFAULT 0,
+  memo text,
+  CONSTRAINT journal_lines_debit_credit_check CHECK (
+    (debit_amount >= 0 AND credit_amount >= 0) AND
+    ((debit_amount > 0 AND credit_amount = 0) OR (debit_amount = 0 AND credit_amount > 0))
+  )
+);
+
+CREATE INDEX IF NOT EXISTS idx_journal_entries_date ON journal_entries(date DESC);
+CREATE INDEX IF NOT EXISTS idx_journal_entries_source ON journal_entries(source_ref_type, source_ref_id);
+CREATE INDEX IF NOT EXISTS idx_journal_lines_entry ON journal_lines(journal_entry_id);
+CREATE INDEX IF NOT EXISTS idx_journal_lines_account ON journal_lines(account_id);
+
+-- Migration: Allow source_ref_type 'transfer' for bank account-to-account transfers
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'journal_entries_source_ref_type_check') THEN
+    ALTER TABLE journal_entries DROP CONSTRAINT journal_entries_source_ref_type_check;
+  END IF;
+  ALTER TABLE journal_entries ADD CONSTRAINT journal_entries_source_ref_type_check
+    CHECK (source_ref_type IN ('expense', 'sale', 'bank', 'manual', 'transfer'));
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+-- Migration: Add account_id to expenses and suppliers (chart of accounts)
+ALTER TABLE expenses ADD COLUMN IF NOT EXISTS account_id uuid REFERENCES accounts(id) ON DELETE SET NULL;
+ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS account_id uuid REFERENCES accounts(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS idx_expenses_account ON expenses(account_id);
+CREATE INDEX IF NOT EXISTS idx_suppliers_account ON suppliers(account_id);
+
+-- Migration: Set expense account_id from category_id (map legacy expense_categories to accounts, default 429 General Expenses)
+UPDATE expenses e
+SET account_id = COALESCE(
+  (SELECT a.id FROM accounts a
+   JOIN expense_categories ec ON ec.id = e.category_id
+   WHERE a.code = CASE
+     WHEN ec.name LIKE '%Marketing%' OR ec.name LIKE '%Advertising%' THEN 400
+     WHEN ec.name LIKE '%Professional%' OR ec.name LIKE '%Legal%' OR ec.name LIKE '%Accounting%' THEN 412
+     WHEN ec.name LIKE '%Travel%' OR ec.name LIKE '%Transport%' OR ec.name LIKE '%Vehicle%' THEN 449
+     WHEN ec.name LIKE '%Equipment%' OR ec.name LIKE '%Hardware%' THEN 429
+     WHEN ec.name LIKE '%Rent%' OR ec.name LIKE '%Utilities%' THEN 477
+     WHEN ec.name LIKE '%Insurance%' THEN 433
+     WHEN ec.name LIKE '%Banking%' OR ec.name LIKE '%Fees%' THEN 404
+     WHEN ec.name LIKE '%Meals%' OR ec.name LIKE '%Entertainment%' THEN 429
+     WHEN ec.name LIKE '%Training%' OR ec.name LIKE '%Education%' THEN 429
+     ELSE 429
+   END LIMIT 1),
+  (SELECT id FROM accounts WHERE code = 429 LIMIT 1)
+)
+WHERE e.category_id IS NOT NULL AND e.account_id IS NULL;
+
+-- Migration: Set supplier account_id from category_id (same mapping, default 429)
+UPDATE suppliers s
+SET account_id = COALESCE(
+  (SELECT a.id FROM accounts a
+   JOIN expense_categories ec ON ec.id = s.category_id
+   WHERE a.code = CASE
+     WHEN ec.name LIKE '%Marketing%' OR ec.name LIKE '%Advertising%' THEN 400
+     WHEN ec.name LIKE '%Professional%' OR ec.name LIKE '%Legal%' OR ec.name LIKE '%Accounting%' THEN 412
+     WHEN ec.name LIKE '%Travel%' OR ec.name LIKE '%Vehicle%' THEN 449
+     WHEN ec.name LIKE '%Rent%' OR ec.name LIKE '%Utilities%' THEN 477
+     WHEN ec.name LIKE '%Insurance%' THEN 433
+     WHEN ec.name LIKE '%Banking%' OR ec.name LIKE '%Fees%' THEN 404
+     ELSE 429
+   END LIMIT 1),
+  (SELECT id FROM accounts WHERE code = 429 LIMIT 1)
+)
+WHERE s.category_id IS NOT NULL AND s.account_id IS NULL;
 
 -- Single row: company/invoice details for PDF (companyName, tagline, address, vatNumber, companyNumber, email, footerLine1, footerLine2)
 CREATE TABLE IF NOT EXISTS invoice_settings (

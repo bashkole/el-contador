@@ -1,6 +1,12 @@
 # Build from project root: docker compose build (or docker build -f server/Dockerfile .)
-# Expects pre-built frontend (frontend/dist). From source: run "npm run build" in frontend first.
-# When installed via npm, the package ships frontend/dist; no frontend source is included.
+# When installed via npm, the package includes the full frontend/ so we build it here.
+FROM node:20-alpine AS frontend-builder
+WORKDIR /app/frontend
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci
+COPY frontend/ .
+RUN npm run build
+
 FROM node:20-alpine
 
 WORKDIR /app
@@ -9,7 +15,7 @@ COPY server/package.json server/package-lock.json* ./
 RUN npm ci --omit=dev
 
 COPY server/ .
-COPY frontend/dist/ /frontend/dist/
+COPY --from=frontend-builder /app/frontend/dist/ /frontend/dist/
 
 EXPOSE 3000
 

@@ -34,8 +34,8 @@
     --chart-6: oklch(0.72 0.19 165);
     --chart-7: oklch(0.6 0.22 25);
     --chart-8: oklch(0.45 0.2 265);
-    --chart-revenue: lch(73.2% 44.87 177.66)
-    --chart-expenses: lch(52.4% 74.12 16.07);
+    --chart-revenue: #42d4a6;
+    --chart-expenses: #f13f66;
     /* Reconciliation match block */
     --reconciliation-match-bg: #eff6ff;
     --reconciliation-match-border: lch(88.74% 26.13 221.7);
@@ -79,8 +79,8 @@
     --chart-6: oklch(0.72 0.19 165);
     --chart-7: oklch(0.6 0.22 25);
     --chart-8: oklch(0.45 0.2 265);
-    --chart-revenue: oklch(0.732 0.4487 177.66);
-    --chart-expenses: oklch(0.527 0.861 1.16);
+    --chart-revenue: #10b981;
+    --chart-expenses: #f87171;
     --reconciliation-match-bg: #1e3a5f;
     --reconciliation-match-border: #2563eb;
     --reconciliation-match-muted-bg: rgba(30, 58, 95, 0.4);

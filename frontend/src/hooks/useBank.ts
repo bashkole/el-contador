@@ -31,8 +31,9 @@ export function useBankImportPreview() {
 export function useConfirmBankImport() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (rows: BankImportPreviewRow[]) => {
-      const { data } = await api.post('/bank-transactions/import/confirm', { rows });
+    mutationFn: async (payload: { rows: BankImportPreviewRow[]; accountId?: string | null }) => {
+      const { rows, accountId } = payload;
+      const { data } = await api.post('/bank-transactions/import/confirm', { rows, accountId: accountId || undefined });
       return data;
     },
     onSuccess: () => {
@@ -45,7 +46,7 @@ export function useConfirmBankImport() {
 export function useUpdateBankTransaction() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, ...payload }: { id: string; date?: string; type?: string; amount?: number; reference?: string; description?: string }) => {
+    mutationFn: async ({ id, ...payload }: { id: string; date?: string; type?: string; amount?: number; reference?: string; description?: string; accountId?: string | null }) => {
       const { data } = await api.patch(`/bank-transactions/${encodeURIComponent(id)}`, payload);
       return data;
     },

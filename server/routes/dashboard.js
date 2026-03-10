@@ -102,6 +102,28 @@ router.get('/summary', async (req, res) => {
   );
   const bankBalance = Math.round(Number(bankBalanceResult.rows[0]?.balance || 0) * 100) / 100;
 
+  // Per-account bank balance (when account_id exists)
+  let bankBalanceByAccount = [];
+  try {
+    const byAccount = await pool.query(
+      `SELECT bt.account_id, a.code AS account_code, a.name AS account_name,
+              COALESCE(SUM(CASE WHEN bt.type = 'in' THEN bt.amount ELSE -bt.amount END), 0) AS balance
+       FROM bank_transactions bt
+       LEFT JOIN accounts a ON a.id = bt.account_id
+       WHERE bt.account_id IS NOT NULL
+       GROUP BY bt.account_id, a.code, a.name
+       ORDER BY a.code`
+    );
+    bankBalanceByAccount = byAccount.rows.map((r) => ({
+      accountId: r.account_id,
+      accountCode: r.account_code != null ? Number(r.account_code) : null,
+      accountName: r.account_name ?? null,
+      balance: Math.round(Number(r.balance) * 100) / 100,
+    }));
+  } catch (err) {
+    if (err.code !== '42703') throw err;
+  }
+
   res.json({
     periods,
     totalIncome: Math.round(totalIncome * 100) / 100,
@@ -111,6 +133,7 @@ router.get('/summary', async (req, res) => {
     cashflowOutgoing,
     cashflow,
     bankBalance,
+    bankBalanceByAccount,
     from: fromStr,
     to: toStr,
   });

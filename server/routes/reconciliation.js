@@ -1,16 +1,31 @@
 const express = require('express');
 const { pool } = require('../db/pool');
+const { postTransfer, deleteTransferJournalEntry } = require('../services/journal-posting');
 
 const router = express.Router();
 
 const RECON_TOLERANCE = 0.5;
 
-/** Get suggested auto-matches: open bank tx paired with open expense/sale by amount (within tolerance) */
+/** Get suggested auto-matches: open bank tx paired with open expense/sale by amount (within tolerance), plus transfer pairs */
 router.get('/suggestions', async (req, res) => {
   try {
-    const openTx = await pool.query(
-      `SELECT id, date, type, amount, description FROM bank_transactions WHERE reconciled = false ORDER BY date DESC`
-    );
+    let openTxRows;
+    let hasAccountId = false;
+    try {
+      const openTx = await pool.query(
+        `SELECT id, date, type, amount, description, account_id FROM bank_transactions WHERE reconciled = false ORDER BY date DESC`
+      );
+      openTxRows = openTx.rows;
+      hasAccountId = true;
+    } catch (err) {
+      if (err.code === '42703') {
+        const openTx = await pool.query(
+          `SELECT id, date, type, amount, description FROM bank_transactions WHERE reconciled = false ORDER BY date DESC`
+        );
+        openTxRows = openTx.rows;
+      } else throw err;
+    }
+
     const openExpenses = await pool.query(
       `SELECT id, date, vendor, amount, vat FROM expenses WHERE reconciled = false AND bank_transaction_id IS NULL ORDER BY date DESC`
     );
@@ -23,7 +38,7 @@ router.get('/suggestions', async (req, res) => {
     const usedExpense = new Set();
     const usedSale = new Set();
 
-    for (const tx of openTx.rows) {
+    for (const tx of openTxRows) {
       if (usedTx.has(tx.id)) continue;
       const txAmount = Number(tx.amount);
 
@@ -68,6 +83,48 @@ router.get('/suggestions', async (req, res) => {
             });
             break;
           }
+        }
+      }
+    }
+
+    // Transfer suggestions: unreconciled pairs with different account_id, opposite type, same amount
+    if (hasAccountId) {
+      const openTxWithAccount = await pool.query(
+        `SELECT bt.id, bt.date, bt.type, bt.amount, bt.description, bt.account_id, a.name AS account_name
+         FROM bank_transactions bt
+         LEFT JOIN accounts a ON a.id = bt.account_id
+         WHERE bt.reconciled = false AND bt.account_id IS NOT NULL
+         ORDER BY bt.date DESC`
+      );
+      const txByAmount = new Map();
+      for (const tx of openTxWithAccount.rows) {
+        const key = Math.round(Number(tx.amount) * 100) / 100;
+        if (!txByAmount.has(key)) txByAmount.set(key, []);
+        txByAmount.get(key).push(tx);
+      }
+      for (const tx of openTxWithAccount.rows) {
+        if (usedTx.has(tx.id)) continue;
+        const amount = Number(tx.amount);
+        const candidates = txByAmount.get(Math.round(amount * 100) / 100) || [];
+        for (const other of candidates) {
+          if (other.id === tx.id || usedTx.has(other.id)) continue;
+          if (!other.account_id || String(other.account_id) === String(tx.account_id)) continue;
+          if (other.type === tx.type) continue;
+          usedTx.add(tx.id);
+          usedTx.add(other.id);
+          suggestions.push({
+            bankTransactionId: tx.id,
+            bankDate: tx.date,
+            bankType: tx.type,
+            bankAmount: amount,
+            bankDescription: tx.description,
+            targetId: other.id,
+            targetType: 'transfer',
+            targetLabel: other.account_name || 'Other account',
+            targetAmount: amount,
+            pairedBankTransactionId: other.id,
+          });
+          break;
         }
       }
     }
@@ -202,6 +259,71 @@ router.post('/match-expenses', async (req, res) => {
   }
 });
 
+/** Match two bank transactions as a transfer (different accounts, opposite direction, same amount) */
+router.post('/match-transfer', async (req, res) => {
+  const { bankTransactionId, pairedBankTransactionId } = req.body || {};
+  if (!bankTransactionId || !pairedBankTransactionId) {
+    return res.status(400).json({ error: 'bankTransactionId and pairedBankTransactionId required' });
+  }
+  if (bankTransactionId === pairedBankTransactionId) {
+    return res.status(400).json({ error: 'The two transactions must be different' });
+  }
+  const now = new Date().toISOString();
+  const client = await pool.connect();
+  try {
+    const rows = await client.query(
+      `SELECT id, type, amount, account_id, reconciled FROM bank_transactions WHERE id IN ($1, $2)`,
+      [bankTransactionId, pairedBankTransactionId]
+    );
+    if (rows.rows.length !== 2) {
+      return res.status(404).json({ error: 'One or both bank transactions not found' });
+    }
+    const t1 = rows.rows.find((r) => r.id === bankTransactionId);
+    const t2 = rows.rows.find((r) => r.id === pairedBankTransactionId);
+    if (!t1 || !t2) return res.status(404).json({ error: 'One or both bank transactions not found' });
+    if (t1.reconciled || t2.reconciled) {
+      return res.status(400).json({ error: 'Both transactions must be unreconciled' });
+    }
+    if (!t1.account_id || !t2.account_id) {
+      return res.status(400).json({ error: 'Both transactions must have an account assigned' });
+    }
+    if (String(t1.account_id) === String(t2.account_id)) {
+      return res.status(400).json({ error: 'Transactions must be from different accounts' });
+    }
+    if (t1.type === t2.type) {
+      return res.status(400).json({ error: 'One must be in and one out' });
+    }
+    const amt1 = Number(t1.amount);
+    const amt2 = Number(t2.amount);
+    if (Math.abs(amt1 - amt2) > RECON_TOLERANCE) {
+      return res.status(400).json({
+        error: 'Amounts must match within 0.50 EUR',
+        amount1: amt1,
+        amount2: amt2,
+      });
+    }
+    await client.query('BEGIN');
+    await client.query(
+      `UPDATE bank_transactions SET reconciled = true, reconciliation_ref_type = 'transfer', reconciliation_ref_id = $1, reconciled_at = $2, adjustment_amount = 0 WHERE id = $3`,
+      [pairedBankTransactionId, now, bankTransactionId]
+    );
+    await client.query(
+      `UPDATE bank_transactions SET reconciled = true, reconciliation_ref_type = 'transfer', reconciliation_ref_id = $1, reconciled_at = $2, adjustment_amount = 0 WHERE id = $3`,
+      [bankTransactionId, now, pairedBankTransactionId]
+    );
+    const outId = t1.type === 'out' ? t1.id : t2.id;
+    const inId = t1.type === 'in' ? t1.id : t2.id;
+    await postTransfer(outId, inId);
+    await client.query('COMMIT');
+    res.json({ ok: true });
+  } catch (e) {
+    await client.query('ROLLBACK');
+    res.status(500).json({ error: e.message });
+  } finally {
+    client.release();
+  }
+});
+
 const ACCOUNT_TYPES = ['loan', 'accrual', 'retro', 'other'];
 
 /** Reconcile a bank transaction to an account (no expense or invoice). For loans, accruals, retros, etc. */
@@ -270,6 +392,12 @@ router.post('/unmatch', async (req, res) => {
     } else if (row.reconciliation_ref_type === 'sale' && row.reconciliation_ref_id) {
       await client.query(
         `UPDATE sales SET reconciled = false, reconciled_at = NULL WHERE id = $1`,
+        [row.reconciliation_ref_id]
+      );
+    } else if (row.reconciliation_ref_type === 'transfer' && row.reconciliation_ref_id) {
+      await deleteTransferJournalEntry(bankTransactionId, row.reconciliation_ref_id);
+      await client.query(
+        `UPDATE bank_transactions SET reconciled = false, reconciliation_ref_type = NULL, reconciliation_ref_id = NULL, reconciled_at = NULL, adjustment_amount = 0 WHERE id = $1`,
         [row.reconciliation_ref_id]
       );
     }

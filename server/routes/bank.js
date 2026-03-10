@@ -5,6 +5,41 @@ const { pool } = require('../db/pool');
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 2 * 1024 * 1024 } });
 
+const ASSET_ACCOUNT_CODE_MIN = 100;
+const ASSET_ACCOUNT_CODE_MAX = 199;
+const DEFAULT_BANK_ACCOUNT_CODE = 100;
+
+/** Resolve account id for code 100 (default bank). Returns null if not found. */
+async function getDefaultBankAccountId() {
+  const r = await pool.query('SELECT id FROM accounts WHERE code = $1 AND active = true', [DEFAULT_BANK_ACCOUNT_CODE]);
+  return r.rows.length ? r.rows[0].id : null;
+}
+
+/** Validate that accountId is an active asset account (code 100-199). Returns { valid, id } or { valid: false, error }. */
+async function validateAssetAccountId(accountId) {
+  if (!accountId) return { valid: false, error: 'accountId required' };
+  const r = await pool.query(
+    'SELECT a.id, a.code FROM accounts a JOIN account_groups ag ON ag.id = a.account_group_id WHERE a.id = $1 AND a.active = true AND ag.code_min = $2 AND ag.code_max = $3',
+    [accountId, ASSET_ACCOUNT_CODE_MIN, ASSET_ACCOUNT_CODE_MAX]
+  );
+  if (r.rows.length === 0) {
+    return { valid: false, error: 'Account not found or not an asset account (code 100-199)' };
+  }
+  return { valid: true, id: r.rows[0].id };
+}
+
+/** Resolve account_id for bank: use provided accountId if valid, else default to code 100. */
+async function resolveBankAccountId(accountId) {
+  if (accountId) {
+    const v = await validateAssetAccountId(accountId);
+    if (!v.valid) return { error: v.error };
+    return { accountId: v.id };
+  }
+  const defaultId = await getDefaultBankAccountId();
+  if (!defaultId) return { error: 'Default bank account (code 100) not found' };
+  return { accountId: defaultId };
+}
+
 function parseCsvLine(line) {
   const out = [];
   let cur = '';
@@ -145,8 +180,13 @@ router.post('/import/preview', upload.single('file'), (req, res) => {
 
 router.post('/import/confirm', async (req, res) => {
   const rows = req.body && req.body.rows;
+  const accountId = req.body && req.body.accountId;
   if (!Array.isArray(rows) || rows.length === 0) {
     return res.status(400).json({ error: 'No rows to import. Send { rows: [{ date, type, amount, description, reference }, ...] }.' });
+  }
+  const resolved = await resolveBankAccountId(accountId || null);
+  if (resolved.error) {
+    return res.status(400).json({ error: resolved.error });
   }
   const client = await pool.connect();
   try {
@@ -159,8 +199,8 @@ router.post('/import/confirm', async (req, res) => {
       const reference = (row.reference != null ? String(row.reference) : '').trim();
       if (!date) continue;
       await client.query(
-        'INSERT INTO bank_transactions (date, type, amount, reference, description) VALUES ($1, $2, $3, $4, $5)',
-        [date, type, amount, reference, description]
+        'INSERT INTO bank_transactions (date, type, amount, reference, description, account_id) VALUES ($1, $2, $3, $4, $5, $6)',
+        [date, type, amount, reference, description, resolved.accountId]
       );
       inserted++;
     }
@@ -170,20 +210,8 @@ router.post('/import/confirm', async (req, res) => {
   }
 });
 
-router.get('/', async (req, res) => {
-  let r;
-  try {
-    r = await pool.query(
-      'SELECT id, date, type, amount, reference, description, reconciled, reconciliation_ref_type, reconciliation_ref_id, reconciled_at, adjustment_amount, account_type, account_note, created_at FROM bank_transactions ORDER BY date DESC'
-    );
-  } catch (err) {
-    if (err.code === '42703') {
-      r = await pool.query(
-        'SELECT id, date, type, amount, reference, description, reconciled, reconciliation_ref_type, reconciliation_ref_id, reconciled_at, created_at FROM bank_transactions ORDER BY date DESC'
-      );
-    } else throw err;
-  }
-  res.json(r.rows.map(row => ({
+function mapBankRow(row) {
+  const out = {
     id: row.id,
     date: row.date,
     type: row.type,
@@ -198,24 +226,56 @@ router.get('/', async (req, res) => {
     accountType: row.account_type ?? null,
     accountNote: row.account_note ?? null,
     createdAt: row.created_at,
-  })));
+  };
+  if (row.account_id != null) {
+    out.accountId = row.account_id;
+    out.accountCode = row.account_code != null ? Number(row.account_code) : null;
+    out.accountName = row.account_name ?? null;
+  }
+  return out;
+}
+
+router.get('/', async (req, res) => {
+  let r;
+  try {
+    r = await pool.query(
+      `SELECT bt.id, bt.date, bt.type, bt.amount, bt.reference, bt.description, bt.reconciled, bt.reconciliation_ref_type, bt.reconciliation_ref_id, bt.reconciled_at, bt.adjustment_amount, bt.account_type, bt.account_note, bt.created_at,
+              bt.account_id, a.code AS account_code, a.name AS account_name
+       FROM bank_transactions bt
+       LEFT JOIN accounts a ON a.id = bt.account_id
+       ORDER BY bt.date DESC`
+    );
+  } catch (err) {
+    if (err.code === '42703') {
+      r = await pool.query(
+        'SELECT id, date, type, amount, reference, description, reconciled, reconciliation_ref_type, reconciliation_ref_id, reconciled_at, adjustment_amount, account_type, account_note, created_at FROM bank_transactions ORDER BY date DESC'
+      );
+    } else throw err;
+  }
+  res.json(r.rows.map(mapBankRow));
 });
 
 router.post('/', async (req, res) => {
-  const { date, type, amount, reference, description } = req.body || {};
+  const { date, type, amount, reference, description, accountId } = req.body || {};
+  const resolved = await resolveBankAccountId(accountId || null);
+  if (resolved.error) {
+    return res.status(400).json({ error: resolved.error });
+  }
   const r = await pool.query(
-    `INSERT INTO bank_transactions (date, type, amount, reference, description)
-     VALUES ($1, $2, $3, $4, $5)
-     RETURNING id, date, type, amount, reference, description, reconciled, reconciliation_ref_type, reconciliation_ref_id, reconciled_at, created_at`,
+    `INSERT INTO bank_transactions (date, type, amount, reference, description, account_id)
+     VALUES ($1, $2, $3, $4, $5, $6)
+     RETURNING id, date, type, amount, reference, description, reconciled, reconciliation_ref_type, reconciliation_ref_id, reconciled_at, account_id, created_at`,
     [
       date,
       type === 'in' ? 'in' : 'out',
-      Number(amount) || 0,
+      Math.round((Number(amount) || 0) * 100) / 100,
       (reference || '').trim(),
       (description || '').trim(),
+      resolved.accountId,
     ]
   );
   const row = r.rows[0];
+  const acc = row.account_id ? (await pool.query('SELECT code, name FROM accounts WHERE id = $1', [row.account_id])).rows[0] : null;
   res.status(201).json({
     id: row.id,
     date: row.date,
@@ -227,14 +287,17 @@ router.post('/', async (req, res) => {
     reconciliationRefType: row.reconciliation_ref_type,
     reconciliationRefId: row.reconciliation_ref_id,
     reconciledAt: row.reconciled_at,
+    accountId: row.account_id,
+    accountCode: acc ? Number(acc.code) : null,
+    accountName: acc ? acc.name : null,
     createdAt: row.created_at,
   });
 });
 
-/** Update a bank transaction (date, type, amount, reference, description). */
+/** Update a bank transaction (date, type, amount, reference, description, accountId). */
 router.patch('/:id', async (req, res) => {
   const id = req.params.id;
-  const { date, type, amount, reference, description } = req.body || {};
+  const { date, type, amount, reference, description, accountId } = req.body || {};
   const r = await pool.query('SELECT id FROM bank_transactions WHERE id = $1', [id]);
   if (r.rows.length === 0) {
     return res.status(404).json({ error: 'Bank transaction not found' });
@@ -262,6 +325,14 @@ router.patch('/:id', async (req, res) => {
     updates.push(`description = $${pos++}`);
     values.push((description || '').trim());
   }
+  if (accountId !== undefined) {
+    const v = await validateAssetAccountId(accountId);
+    if (!v.valid) {
+      return res.status(400).json({ error: v.error });
+    }
+    updates.push(`account_id = $${pos++}`);
+    values.push(v.id);
+  }
   if (updates.length === 0) {
     return res.status(400).json({ error: 'No fields to update' });
   }
@@ -271,23 +342,13 @@ router.patch('/:id', async (req, res) => {
     values
   );
   const out = await pool.query(
-    'SELECT id, date, type, amount, reference, description, reconciled, reconciliation_ref_type, reconciliation_ref_id, reconciled_at, created_at FROM bank_transactions WHERE id = $1',
+    `SELECT bt.id, bt.date, bt.type, bt.amount, bt.reference, bt.description, bt.reconciled, bt.reconciliation_ref_type, bt.reconciliation_ref_id, bt.reconciled_at, bt.adjustment_amount, bt.account_type, bt.account_note, bt.created_at, bt.account_id, a.code AS account_code, a.name AS account_name
+     FROM bank_transactions bt LEFT JOIN accounts a ON a.id = bt.account_id WHERE bt.id = $1`,
     [id]
   );
   const row = out.rows[0];
-  res.json({
-    id: row.id,
-    date: row.date,
-    type: row.type,
-    amount: Number(row.amount),
-    reference: row.reference,
-    description: row.description,
-    reconciled: row.reconciled,
-    reconciliationRefType: row.reconciliation_ref_type,
-    reconciliationRefId: row.reconciliation_ref_id,
-    reconciledAt: row.reconciled_at,
-    createdAt: row.created_at,
-  });
+  if (!row) return res.status(404).json({ error: 'Bank transaction not found' });
+  res.json(mapBankRow(row));
 });
 
 /** Delete a bank transaction (e.g. to remove duplicated import). Only allowed for unpaired lines. */

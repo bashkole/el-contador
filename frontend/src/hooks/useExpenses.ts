@@ -21,6 +21,19 @@ export function useExpenseCategories() {
   });
 }
 
+/** Expense accounts (chart of accounts 400-799) for expense dropdowns */
+export function useExpenseAccounts() {
+  return useQuery({
+    queryKey: ['accounts', 'expense'],
+    queryFn: async () => {
+      const { data } = await api.get('/accounts?type=expense');
+      return data;
+    },
+    refetchOnMount: true,
+    staleTime: 0,
+  });
+}
+
 export function useCreateExpense() {
   const queryClient = useQueryClient();
   return useMutation({

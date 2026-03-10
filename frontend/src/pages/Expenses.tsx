@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useExpenses, useDeleteExpense, useExpenseCategories } from '../hooks/useExpenses';
+import { useExpenses, useDeleteExpense, useExpenseCategories, useExpenseAccounts } from '../hooks/useExpenses';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -23,6 +23,7 @@ const defaultFormValues = {
   vatRate: '21',
   vat: '',
   categoryId: '' as string,
+  accountId: '' as string,
   invoiceNumber: '',
   notes: '',
 };
@@ -82,6 +83,7 @@ export default function Expenses() {
   const [selectedExpenseIds, setSelectedExpenseIds] = useState<Set<number>>(new Set());
   const [multiEditCategoryOpen, setMultiEditCategoryOpen] = useState(false);
   const [multiEditCategoryId, setMultiEditCategoryId] = useState<string | null>(null);
+  const [multiEditAccountId, setMultiEditAccountId] = useState<string | null>(null);
   const [multiEditSaving, setMultiEditSaving] = useState(false);
   const [sortBy, setSortBy] = useState<ExpenseSortKey>('date');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
@@ -96,7 +98,9 @@ export default function Expenses() {
   };
 
   const { data: categories } = useExpenseCategories();
+  const { data: expenseAccounts } = useExpenseAccounts();
   const { data: suppliers } = useSuppliers();
+  const useAccountId = (expenseAccounts && expenseAccounts.length > 0);
 
   const [batchOpen, setBatchOpen] = useState(false);
   const [batchStep, setBatchStep] = useState<1 | 2 | 3>(1);
@@ -128,6 +132,7 @@ export default function Expenses() {
           vatRate: selectedExpense.vatRate != null ? String(selectedExpense.vatRate) : '21',
           vat: selectedExpense.vat != null ? String(selectedExpense.vat) : '',
           categoryId: selectedExpense.categoryId ?? '',
+          accountId: selectedExpense.accountId ?? selectedExpense.categoryId ?? '',
           invoiceNumber: selectedExpense.invoiceNumber ?? '',
           notes: selectedExpense.notes ?? '',
         });
@@ -231,7 +236,9 @@ export default function Expenses() {
     if (selectedExpenseIds.size === 0) return;
     setMultiEditSaving(true);
     try {
-      const payload = multiEditCategoryId ? { categoryId: multiEditCategoryId } : { categoryId: null };
+      const payload = useAccountId
+        ? (multiEditAccountId != null ? { accountId: multiEditAccountId } : { accountId: null })
+        : (multiEditCategoryId ? { categoryId: multiEditCategoryId } : { categoryId: null });
       await Promise.all(
         Array.from(selectedExpenseIds).map((id) =>
           api.put(`/expenses/${id}`, payload)
@@ -241,10 +248,11 @@ export default function Expenses() {
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
       setMultiEditCategoryOpen(false);
       setMultiEditCategoryId(null);
+      setMultiEditAccountId(null);
       setSelectedExpenseIds(new Set());
     } catch (err) {
       console.error(err);
-      alert('Failed to update categories');
+      alert('Failed to update accounts');
     } finally {
       setMultiEditSaving(false);
     }
@@ -358,7 +366,7 @@ export default function Expenses() {
                       </TableCell>
                       <TableCell className="w-24 whitespace-nowrap">{formatYyMmDd(expense.date)}</TableCell>
                       <TableCell className="w-40 font-medium truncate" title={expense.vendor || undefined}>{truncate(expense.vendor)}</TableCell>
-                      <TableCell className="w-28 truncate" title={expense.categoryName || undefined}>{truncate(expense.categoryName, 14) || '\u2014'}</TableCell>
+                      <TableCell className="w-28 truncate" title={expense.accountName || expense.categoryName || undefined}>{truncate(expense.accountName || expense.categoryName, 14) || '\u2014'}</TableCell>
                       <TableCell className="w-24 text-right whitespace-nowrap">€{Number(expense.amount).toFixed(2)}</TableCell>
                       <TableCell className="w-24 text-right whitespace-nowrap">€{(Number(expense.amount) + Number(expense.vat || 0)).toFixed(2)}</TableCell>
                       <TableCell className="w-20">
@@ -461,8 +469,8 @@ export default function Expenses() {
                     <div>€{Number(selectedExpense.amount).toFixed(2)}</div>
                   </div>
                   <div>
-                    <div className="text-sm font-medium text-muted-foreground">Category</div>
-                    <div>{selectedExpense.categoryName || '-'}</div>
+                    <div className="text-sm font-medium text-muted-foreground">Account / Category</div>
+                    <div>{selectedExpense.accountName || selectedExpense.categoryName || '-'}</div>
                   </div>
                   <div className="col-span-2">
                     <div className="text-sm font-medium text-muted-foreground">Notes</div>
@@ -546,22 +554,33 @@ export default function Expenses() {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Category</label>
-                  <Select value={formValues.categoryId} onValueChange={(v) => setFormValues((p) => ({ ...p, categoryId: v ?? '' }))}>
+                  <label className="text-sm font-medium">{useAccountId ? 'Account' : 'Category'}</label>
+                  <Select
+                    value={useAccountId ? (formValues.accountId || '') : (formValues.categoryId || '')}
+                    onValueChange={(v) => setFormValues((p) => ({
+                      ...p,
+                      accountId: useAccountId ? (v ?? '') : p.accountId,
+                      categoryId: useAccountId ? p.categoryId : (v ?? ''),
+                    }))}
+                  >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select category">
-                        {formValues.categoryId
-                          ? (categories || []).find((c: any) => c.id === formValues.categoryId)?.name
-                          : undefined}
+                      <SelectValue placeholder={useAccountId ? 'Select account' : 'Select category'}>
+                        {useAccountId && formValues.accountId
+                          ? (expenseAccounts || []).find((a: any) => a.id === formValues.accountId) && `${(expenseAccounts || []).find((a: any) => a.id === formValues.accountId)?.code} - ${(expenseAccounts || []).find((a: any) => a.id === formValues.accountId)?.name}`
+                          : !useAccountId && formValues.categoryId
+                            ? (categories || []).find((c: any) => c.id === formValues.categoryId)?.name
+                            : undefined}
                       </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">No category</SelectItem>
-                      {(categories || []).sort((a: any, b: any) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)).map((cat: any) => (
-                        <SelectItem key={cat.id} value={cat.id}>
-                          {cat.name}
-                        </SelectItem>
-                      ))}
+                      <SelectItem value="">No {useAccountId ? 'account' : 'category'}</SelectItem>
+                      {useAccountId
+                        ? (expenseAccounts || []).sort((a: any, b: any) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || (a.code - b.code)).map((acc: any) => (
+                            <SelectItem key={acc.id} value={acc.id}>{acc.code} - {acc.name}</SelectItem>
+                          ))
+                        : (categories || []).sort((a: any, b: any) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)).map((cat: any) => (
+                            <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                          ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -613,30 +632,44 @@ export default function Expenses() {
       <Dialog open={multiEditCategoryOpen} onOpenChange={setMultiEditCategoryOpen}>
         <DialogContent className="sm:max-w-[400px]">
           <DialogHeader>
-            <DialogTitle>Change category</DialogTitle>
+            <DialogTitle>{useAccountId ? 'Change account' : 'Change category'}</DialogTitle>
           </DialogHeader>
           <p className="text-sm text-muted-foreground">
-            Set category for {selectedExpenseIds.size} selected expense{selectedExpenseIds.size !== 1 ? 's' : ''}.
+            Set {useAccountId ? 'account' : 'category'} for {selectedExpenseIds.size} selected expense{selectedExpenseIds.size !== 1 ? 's' : ''}.
           </p>
           <div className="space-y-2 py-2">
-            <label className="text-sm font-medium">Category</label>
-            <Select value={multiEditCategoryId ?? ''} onValueChange={(v) => setMultiEditCategoryId(v || null)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select category">
-                  {multiEditCategoryId
-                    ? (categories || []).find((c: any) => c.id === multiEditCategoryId)?.name
-                    : undefined}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="">No category</SelectItem>
-                {(categories || []).sort((a: any, b: any) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)).map((cat: any) => (
-                  <SelectItem key={cat.id} value={cat.id}>
-                    {cat.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <label className="text-sm font-medium">{useAccountId ? 'Account' : 'Category'}</label>
+            {useAccountId ? (
+              <Select value={multiEditAccountId ?? ''} onValueChange={(v) => setMultiEditAccountId(v || null)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select account">
+                    {multiEditAccountId && (expenseAccounts || []).find((a: any) => a.id === multiEditAccountId)
+                      ? `${(expenseAccounts || []).find((a: any) => a.id === multiEditAccountId)?.code} - ${(expenseAccounts || []).find((a: any) => a.id === multiEditAccountId)?.name}`
+                      : undefined}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">No account</SelectItem>
+                  {(expenseAccounts || []).sort((a: any, b: any) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || (a.code - b.code)).map((acc: any) => (
+                    <SelectItem key={acc.id} value={acc.id}>{acc.code} - {acc.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <Select value={multiEditCategoryId ?? ''} onValueChange={(v) => setMultiEditCategoryId(v || null)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select category">
+                    {multiEditCategoryId ? (categories || []).find((c: any) => c.id === multiEditCategoryId)?.name : undefined}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">No category</SelectItem>
+                  {(categories || []).sort((a: any, b: any) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)).map((cat: any) => (
+                    <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="outline" onClick={() => setMultiEditCategoryOpen(false)}>

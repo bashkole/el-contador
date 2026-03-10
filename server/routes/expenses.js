@@ -6,6 +6,7 @@ const crypto = require('crypto');
 const { pool } = require('../db/pool');
 const { extractInvoiceData } = require('../services/invoice-extraction');
 const { sendApprovalNotification } = require('../services/email');
+const { postExpense } = require('../services/journal-posting');
 
 const uploadDir = path.join(__dirname, '..', 'uploads', 'expenses');
 const batchTempDir = path.join(__dirname, '..', 'uploads', 'batch-temp');
@@ -90,6 +91,9 @@ function mapExpenseRow(row, creatorEmail = null) {
     category: row.category,
     categoryId: row.category_id || null,
     categoryName: row.category_name || row.category || null,
+    accountId: row.account_id || null,
+    accountCode: row.account_code != null ? Number(row.account_code) : null,
+    accountName: row.account_name || null,
     amount: Number(row.amount),
     vat: Number(row.vat),
     vatRate: row.vat_rate ? Number(row.vat_rate) : null,
@@ -113,11 +117,13 @@ router.get('/', async (req, res) => {
   const search = (req.query.search || req.query.q || '').trim();
   const filter = (req.query.filter || '').toLowerCase();
   let query = `SELECT e.id, e.date, e.vendor, e.category, e.category_id, ec.name as category_name,
+            e.account_id, a.code as account_code, a.name as account_name,
             e.amount, e.vat, e.vat_rate, e.notes, e.file_name, e.invoice_number, e.reconciled, e.reconciled_at,
             e.supplier_id, e.bank_transaction_id, e.created_at, e.created_by, e.approval_status,
             e.approval_rejected_at, e.approval_rejected_by, u.email as creator_email
      FROM expenses e
      LEFT JOIN expense_categories ec ON e.category_id = ec.id
+     LEFT JOIN accounts a ON e.account_id = a.id
      LEFT JOIN users u ON e.created_by = u.id`;
   const params = [];
   const conditions = [];
@@ -130,7 +136,8 @@ router.get('/', async (req, res) => {
       OR e.invoice_number ILIKE $1
       OR e.notes ILIKE $1
       OR e.category ILIKE $1
-      OR ec.name ILIKE $1`);
+      OR ec.name ILIKE $1
+      OR a.name ILIKE $1)`);
     const numericMatch = search.replace(/[^\d.,-]/g, '').replace(',', '.');
     const amountNum = parseFloat(numericMatch);
     if (!isNaN(amountNum) && isFinite(amountNum)) {
@@ -163,6 +170,7 @@ router.get('/tasks', async (req, res) => {
   }
   const r = await pool.query(
     `SELECT e.id, e.date, e.vendor, e.category, e.category_id, ec.name as category_name,
+            e.account_id, a.code as account_code, a.name as account_name,
             e.amount, e.vat, e.vat_rate, e.notes, e.file_name, e.invoice_number, e.reconciled, e.reconciled_at,
             e.supplier_id, e.bank_transaction_id, e.created_at, e.created_by, e.approval_status,
             e.approval_rejected_at, e.approval_rejected_by, u.email as creator_email,
@@ -170,6 +178,7 @@ router.get('/tasks', async (req, res) => {
      FROM expense_approvals ea
      JOIN expenses e ON ea.expense_id = e.id
      LEFT JOIN expense_categories ec ON e.category_id = ec.id
+     LEFT JOIN accounts a ON e.account_id = a.id
      LEFT JOIN users u ON e.created_by = u.id
      WHERE ea.approver_user_id = $1 AND ea.status = 'pending' AND e.approval_status = 'pending'
      ORDER BY e.date DESC`,
@@ -499,7 +508,7 @@ router.post('/batch/import', async (req, res) => {
 });
 
 router.post('/', upload.single('file'), async (req, res) => {
-  const { date, vendor, category, categoryId, amount, vat, vatRate, notes, supplierId, invoiceNumber } = req.body || {};
+  const { date, vendor, category, categoryId, accountId, amount, vat, vatRate, notes, supplierId, invoiceNumber } = req.body || {};
   const file = req.file;
   const createdBy = req.session?.userId || null;
 
@@ -512,17 +521,27 @@ router.post('/', upload.single('file'), async (req, res) => {
     }
   }
 
-  // Validate categoryId if provided
+  // Prefer accountId (chart of accounts); fallback to categoryId (legacy)
+  let validAccountId = null;
   let validCategoryId = null;
   let categoryName = (category || '').trim();
   let actualVatRate = vatRate ? Number(vatRate) : null;
 
-  if (categoryId) {
+  if (accountId) {
+    const accountCheck = await pool.query('SELECT id, name, default_vat_rate FROM accounts WHERE id = $1 AND active = true', [accountId]);
+    if (accountCheck.rows.length > 0) {
+      validAccountId = accountId;
+      categoryName = accountCheck.rows[0].name;
+      if (!actualVatRate && accountCheck.rows[0].default_vat_rate != null) {
+        actualVatRate = Number(accountCheck.rows[0].default_vat_rate);
+      }
+    }
+  }
+  if (!validAccountId && categoryId) {
     const categoryCheck = await pool.query('SELECT id, name, default_vat_rate FROM expense_categories WHERE id = $1', [categoryId]);
     if (categoryCheck.rows.length > 0) {
       validCategoryId = categoryId;
       categoryName = categoryCheck.rows[0].name;
-      // Use category default vat rate if not provided
       if (!actualVatRate) {
         actualVatRate = Number(categoryCheck.rows[0].default_vat_rate);
       }
@@ -572,14 +591,15 @@ router.post('/', upload.single('file'), async (req, res) => {
   }
 
   const r = await pool.query(
-    `INSERT INTO expenses (date, vendor, category, category_id, amount, vat, vat_rate, notes, file_name, file_path, supplier_id, invoice_number, created_by, approval_status)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-     RETURNING id, date, vendor, category, category_id, amount, vat, vat_rate, notes, file_name, invoice_number, reconciled, reconciled_at, supplier_id, created_at, created_by, approval_status`,
+    `INSERT INTO expenses (date, vendor, category, category_id, account_id, amount, vat, vat_rate, notes, file_name, file_path, supplier_id, invoice_number, created_by, approval_status)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+     RETURNING id, date, vendor, category, category_id, account_id, amount, vat, vat_rate, notes, file_name, invoice_number, reconciled, reconciled_at, supplier_id, created_at, created_by, approval_status`,
     [
       date,
       (vendor || '').trim(),
       categoryName,
       validCategoryId,
+      validAccountId,
       Number(amount) || 0,
       finalVat,
       actualVatRate,
@@ -594,6 +614,12 @@ router.post('/', upload.single('file'), async (req, res) => {
   );
   const row = r.rows[0];
   const expenseId = row.id;
+
+  try {
+    await postExpense(expenseId);
+  } catch (err) {
+    process.stderr.write(`[journal] postExpense(${expenseId}) failed: ${err.message}\n`);
+  }
 
   if (approvalStatus === 'pending' && approversList.length > 0) {
     const levelsOrdered = [1, 0];
@@ -646,6 +672,7 @@ router.post('/', upload.single('file'), async (req, res) => {
     category: row.category,
     categoryId: row.category_id || null,
     categoryName: validCategoryId ? categoryName : row.category,
+    accountId: row.account_id || null,
     amount: Number(row.amount),
     vat: Number(row.vat),
     vatRate: row.vat_rate ? Number(row.vat_rate) : null,
@@ -671,7 +698,7 @@ router.post('/', upload.single('file'), async (req, res) => {
 
 router.put('/:id', async (req, res) => {
   const id = req.params.id;
-  const { date, vendor, categoryId, amount, vat, vatRate, notes, supplierId, invoiceNumber } = req.body || {};
+  const { date, vendor, categoryId, accountId, amount, vat, vatRate, notes, supplierId, invoiceNumber } = req.body || {};
 
   let validSupplierId = null;
   if (supplierId !== undefined) {
@@ -683,10 +710,24 @@ router.put('/:id', async (req, res) => {
     }
   }
 
+  let validAccountId = undefined;
   let validCategoryId = null;
   let categoryName = null;
   let actualVatRate = vatRate !== undefined && vatRate !== '' ? Number(vatRate) : undefined;
-  if (categoryId !== undefined) {
+  if (accountId !== undefined) {
+    if (accountId) {
+      const accountCheck = await pool.query('SELECT id, name, default_vat_rate FROM accounts WHERE id = $1 AND active = true', [accountId]);
+      if (accountCheck.rows.length > 0) {
+        validAccountId = accountId;
+        categoryName = accountCheck.rows[0].name;
+        if (actualVatRate === undefined && accountCheck.rows[0].default_vat_rate != null) actualVatRate = Number(accountCheck.rows[0].default_vat_rate);
+      }
+    } else {
+      validAccountId = null;
+      categoryName = '';
+    }
+  }
+  if (categoryId !== undefined && validAccountId === undefined) {
     if (categoryId) {
       const categoryCheck = await pool.query('SELECT id, name, default_vat_rate FROM expense_categories WHERE id = $1', [categoryId]);
       if (categoryCheck.rows.length > 0) {
@@ -725,6 +766,7 @@ router.put('/:id', async (req, res) => {
   if (vendor !== undefined) { updates.push(`vendor = $${pos++}`); values.push((vendor || '').trim()); }
   if (categoryName !== undefined) { updates.push(`category = $${pos++}`); values.push(categoryName); }
   if (validCategoryId !== undefined) { updates.push(`category_id = $${pos++}`); values.push(validCategoryId); }
+  if (validAccountId !== undefined) { updates.push(`account_id = $${pos++}`); values.push(validAccountId); }
   if (amount !== undefined) { updates.push(`amount = $${pos++}`); values.push(Number(amount) || 0); }
   if (finalVat !== undefined) { updates.push(`vat = $${pos++}`); values.push(finalVat); }
   if (actualVatRate !== undefined) { updates.push(`vat_rate = $${pos++}`); values.push(actualVatRate); }
@@ -738,13 +780,18 @@ router.put('/:id', async (req, res) => {
   values.push(id);
 
   const r = await pool.query(
-    `UPDATE expenses SET ${updates.join(', ')} WHERE id = $${pos} RETURNING id, date, vendor, category, category_id, amount, vat, vat_rate, notes, file_name, invoice_number, reconciled, reconciled_at, supplier_id, created_at`,
+    `UPDATE expenses SET ${updates.join(', ')} WHERE id = $${pos} RETURNING id, date, vendor, category, category_id, account_id, amount, vat, vat_rate, notes, file_name, invoice_number, reconciled, reconciled_at, supplier_id, created_at`,
     values
   );
   if (r.rows.length === 0) {
     return res.status(404).json({ error: 'Expense not found' });
   }
   const row = r.rows[0];
+  try {
+    await postExpense(id);
+  } catch (err) {
+    process.stderr.write(`[journal] postExpense(${id}) failed: ${err.message}\n`);
+  }
   res.json({
     id: row.id,
     date: row.date,
@@ -752,6 +799,7 @@ router.put('/:id', async (req, res) => {
     category: row.category,
     categoryId: row.category_id || null,
     categoryName: row.category || null,
+    accountId: row.account_id || null,
     amount: Number(row.amount),
     vat: Number(row.vat),
     vatRate: row.vat_rate ? Number(row.vat_rate) : null,

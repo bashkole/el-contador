@@ -8,8 +8,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { useInvoiceConfig, useSaveInvoiceConfig, useIntegrationsSettings, useSaveIntegrationsSettings, useUsers, useCreateUser, useDeleteUser, useApprovalSettings, useSaveApprovalSettings, useSaveExpenseCategory, useDeleteExpenseCategory } from '../hooks/useSettings';
-import { useExpenseCategories } from '../hooks/useExpenses';
+import { useQueryClient } from '@tanstack/react-query';
+import { useInvoiceConfig, useSaveInvoiceConfig, useUploadLogo, useIntegrationsSettings, useSaveIntegrationsSettings, useUsers, useCreateUser, useDeleteUser, useApprovalSettings, useSaveApprovalSettings, useAccountGroups, useAccountsAll, useSaveAccount, useDeleteAccount } from '../hooks/useSettings';
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'sonner';
 import { Trash2, Edit, Plus } from 'lucide-react';
@@ -31,7 +31,7 @@ export default function Settings() {
           <TabsTrigger value="integrations" className="py-2.5 data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all">Integrations</TabsTrigger>
           <TabsTrigger value="users" className="py-2.5 data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all">Users</TabsTrigger>
           <TabsTrigger value="approval" className="py-2.5 data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all">Approval</TabsTrigger>
-          <TabsTrigger value="categories" className="py-2.5 data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all">Categories</TabsTrigger>
+          <TabsTrigger value="accounts" className="py-2.5 data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all">Chart of accounts</TabsTrigger>
         </TabsList>
         <div className="row-start-2 min-h-0">
           <TabsContent value="invoice" className="m-0">
@@ -46,8 +46,8 @@ export default function Settings() {
           <TabsContent value="approval" className="m-0">
             <ApprovalSettings />
           </TabsContent>
-          <TabsContent value="categories" className="m-0">
-            <CategoriesSettings />
+          <TabsContent value="accounts" className="m-0">
+            <ChartOfAccountsSettings />
           </TabsContent>
         </div>
       </Tabs>
@@ -58,6 +58,7 @@ export default function Settings() {
 function InvoiceSettings() {
   const { data: config, isLoading } = useInvoiceConfig();
   const saveConfig = useSaveInvoiceConfig();
+  const uploadLogo = useUploadLogo();
   
   const [formData, setFormData] = useState({
     companyName: '',
@@ -81,7 +82,7 @@ function InvoiceSettings() {
         companyNumber: config.companyNumber || '',
         address: config.address || '',
         footer: config.footer || '',
-        geminiApiKey: config.geminiApiKey || '',
+        geminiApiKey: '', // Never loaded; API only returns geminiApiKeySet
         geminiModel: config.geminiModel || 'gemini-2.0-flash'
       });
     }
@@ -90,7 +91,9 @@ function InvoiceSettings() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await saveConfig.mutateAsync(formData);
+      const { geminiApiKey, ...rest } = formData;
+      const payload = geminiApiKey ? { ...rest, geminiApiKey } : rest;
+      await saveConfig.mutateAsync(payload);
       toast.success('Invoice settings saved successfully');
     } catch (err) {
       toast.error('Failed to save settings');
@@ -107,6 +110,38 @@ function InvoiceSettings() {
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="p-4 border rounded-lg space-y-3">
+            <h3 className="font-medium">Company logo</h3>
+            <p className="text-sm text-muted-foreground">Shown in the header of PDF invoices and in the app.</p>
+            <div className="flex flex-wrap items-center gap-4">
+              <div className="min-w-[80px] min-h-[50px] border border-border rounded-lg flex items-center justify-center bg-muted/50">
+                {config?.logoPath ? (
+                  <img src={`/api/invoice-config/logo?t=${config.logoPath}`} alt="" className="max-w-[80px] max-h-[50px] object-contain" />
+                ) : (
+                  <span className="text-sm text-muted-foreground">No logo</span>
+                )}
+              </div>
+              <div className="space-y-2">
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/jpg"
+                  className="block text-sm text-muted-foreground file:mr-2 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    try {
+                      await uploadLogo.mutateAsync(file);
+                      toast.success('Logo uploaded');
+                      e.target.value = '';
+                    } catch {
+                      toast.error('Failed to upload logo');
+                    }
+                  }}
+                />
+                <p className="text-xs text-muted-foreground">PNG or JPEG, max 2 MB</p>
+              </div>
+            </div>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Company Name</Label>
@@ -146,11 +181,20 @@ function InvoiceSettings() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Gemini API Key</Label>
-                <Input type="password" value={formData.geminiApiKey} onChange={e => setFormData({...formData, geminiApiKey: e.target.value})} placeholder="Leave blank to keep current" />
+                <Input
+                  type="password"
+                  value={formData.geminiApiKey}
+                  onChange={e => setFormData({ ...formData, geminiApiKey: e.target.value })}
+                  placeholder={config?.geminiApiKeySet ? '•••••••• (leave blank to keep)' : 'Paste your Gemini API key'}
+                  autoComplete="off"
+                />
+                {config?.geminiApiKeySet && (
+                  <p className="text-xs text-muted-foreground">API key is set. Enter a new value to replace it, or leave blank to keep.</p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label>Model</Label>
-                <Input value={formData.geminiModel} onChange={e => setFormData({...formData, geminiModel: e.target.value})} />
+                <Input value={formData.geminiModel} onChange={e => setFormData({ ...formData, geminiModel: e.target.value })} placeholder="e.g. gemini-2.0-flash" />
               </div>
             </div>
           </div>
@@ -506,139 +550,177 @@ function ApprovalSettings() {
   );
 }
 
-function CategoriesSettings() {
-  const { data: categories, isLoading } = useExpenseCategories();
-  const deleteCategory = useDeleteExpenseCategory();
+function ChartOfAccountsSettings() {
+  const { data: groups, isLoading: groupsLoading } = useAccountGroups();
+  const { data: accounts, isLoading: accountsLoading } = useAccountsAll();
+  const deleteAccount = useDeleteAccount();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingCategory, setEditingCategory] = useState<any>(null);
+  const [editingAccount, setEditingAccount] = useState<any>(null);
 
-  const handleDelete = async (id: number) => {
-    if (confirm('Are you sure you want to delete this category?')) {
+  const handleDelete = async (id: string) => {
+    if (confirm('Are you sure you want to delete this account?')) {
       try {
-        await deleteCategory.mutateAsync(id);
-        toast.success('Category deleted');
-      } catch (err) {
-        toast.error('Failed to delete category');
+        await deleteAccount.mutateAsync(id);
+        toast.success('Account deleted');
+      } catch (err: any) {
+        toast.error(err.response?.data?.error || 'Failed to delete account');
       }
     }
   };
 
-  const openEdit = (cat: any) => {
-    setEditingCategory(cat);
+  const openEdit = (acc: any) => {
+    setEditingAccount(acc);
     setIsDialogOpen(true);
   };
 
-  const openCreate = () => {
-    setEditingCategory(null);
+  const openCreate = (groupId?: string) => {
+    setEditingAccount(groupId ? { accountGroupId: groupId } : null);
     setIsDialogOpen(true);
   };
 
-  if (isLoading) return <div>Loading...</div>;
+  if (groupsLoading || accountsLoading) return <div>Loading...</div>;
+
+  const accountsByGroup = (groups || []).reduce((acc: Record<string, any[]>, g: any) => {
+    const gid = String(g.id);
+    acc[g.id] = (accounts || []).filter((a: any) => String(a.accountGroupId) === gid).sort((a: any, b: any) => (a.sortOrder || 0) - (b.sortOrder || 0) || a.code - b.code);
+    return acc;
+  }, {});
 
   return (
     <Card>
       <CardHeader className="flex flex-row justify-between items-start">
         <div>
-          <CardTitle>Expense Categories</CardTitle>
-          <CardDescription>Categories used for expenses and PnL reporting.</CardDescription>
+          <CardTitle>Chart of accounts</CardTitle>
+          <CardDescription>Account groups and accounts for expenses, revenue, and reporting. Posting goes to journals.</CardDescription>
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2" onClick={openCreate}>
-            <Plus className="w-4 h-4 mr-2" /> Add Category
+          <DialogTrigger className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2" onClick={() => openCreate()}>
+            <Plus className="w-4 h-4 mr-2" /> Add account
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>{editingCategory ? 'Edit Category' : 'Add Category'}</DialogTitle>
+              <DialogTitle>{editingAccount?.id ? 'Edit account' : 'Add account'}</DialogTitle>
             </DialogHeader>
-            <CategoryForm initialData={editingCategory} onSuccess={() => setIsDialogOpen(false)} />
+            <AccountForm groups={groups || []} initialData={editingAccount} onSuccess={() => setIsDialogOpen(false)} />
           </DialogContent>
         </Dialog>
       </CardHeader>
-      <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Description</TableHead>
-              <TableHead>VAT %</TableHead>
-              <TableHead>Account Code</TableHead>
-              <TableHead>Sort Order</TableHead>
-              <TableHead>Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {categories?.sort((a:any, b:any) => (a.sortOrder || 0) - (b.sortOrder || 0)).map((c: any) => (
-              <TableRow key={c.id}>
-                <TableCell className="font-medium">{c.name}</TableCell>
-                <TableCell>{c.description || '-'}</TableCell>
-                <TableCell>{c.defaultVatRate}%</TableCell>
-                <TableCell>{c.accountCode || '-'}</TableCell>
-                <TableCell>{c.sortOrder}</TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-2">
-                    <Button variant="ghost" size="icon" onClick={() => openEdit(c)}>
-                      <Edit className="w-4 h-4" />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="text-red-600 hover:text-red-700 hover:bg-red-50" onClick={() => handleDelete(c.id)}>
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+      <CardContent className="space-y-6">
+        {(groups || []).sort((a: any, b: any) => (a.sortOrder || 0) - (b.sortOrder || 0)).map((g: any) => (
+          <div key={g.id}>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="font-semibold">{g.name} ({g.codeMin}-{g.codeMax})</h3>
+              <Button variant="outline" size="sm" onClick={() => openCreate(g.id)}>Add account</Button>
+            </div>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-20">Code</TableHead>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Description</TableHead>
+                  <TableHead className="w-20">VAT %</TableHead>
+                  <TableHead className="w-24">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(accountsByGroup[g.id] || []).map((a: any) => (
+                  <TableRow key={a.id}>
+                    <TableCell className="font-mono">{a.code}</TableCell>
+                    <TableCell className="font-medium">{a.name}</TableCell>
+                    <TableCell className="text-muted-foreground">{a.description || '-'}</TableCell>
+                    <TableCell>{a.defaultVatRate != null ? `${a.defaultVatRate}%` : '-'}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Button variant="ghost" size="icon" onClick={() => openEdit(a)}>
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="text-red-600 hover:text-red-700 hover:bg-red-50" onClick={() => handleDelete(a.id)}>
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        ))}
       </CardContent>
     </Card>
   );
 }
 
-function CategoryForm({ initialData, onSuccess }: { initialData: any, onSuccess: () => void }) {
-  const saveCategory = useSaveExpenseCategory();
+function AccountForm({ groups, initialData, onSuccess }: { groups: any[]; initialData: any; onSuccess: () => void }) {
+  const queryClient = useQueryClient();
+  const saveAccount = useSaveAccount();
   const [formData, setFormData] = useState({
     id: initialData?.id || '',
+    accountGroupId: initialData?.accountGroupId || (groups[0]?.id || ''),
+    code: initialData?.code ?? '',
     name: initialData?.name || '',
     description: initialData?.description || '',
-    defaultVatRate: initialData?.defaultVatRate || 21,
-    accountCode: initialData?.accountCode || '',
-    sortOrder: initialData?.sortOrder || 0
+    defaultVatRate: initialData?.defaultVatRate != null ? initialData.defaultVatRate : '',
+    sortOrder: initialData?.sortOrder ?? 0,
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await saveCategory.mutateAsync(formData);
-      toast.success(initialData ? 'Category updated' : 'Category created');
+      await saveAccount.mutateAsync({
+        ...formData,
+        defaultVatRate: formData.defaultVatRate === '' ? undefined : Number(formData.defaultVatRate),
+      });
+      await queryClient.refetchQueries({ queryKey: ['accounts', 'all'] });
+      toast.success(initialData?.id ? 'Account updated' : 'Account created');
       onSuccess();
     } catch (err: any) {
-      toast.error(err.response?.data?.error || 'Failed to save category');
+      toast.error(err.response?.data?.error || 'Failed to save account');
     }
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="space-y-2">
+        <Label>Group *</Label>
+        <Select value={formData.accountGroupId} onValueChange={v => setFormData({ ...formData, accountGroupId: v })}>
+          <SelectTrigger>
+            <SelectValue placeholder="Select group">
+              {formData.accountGroupId && (() => {
+                const g = (groups || []).find((x: any) => x.id === formData.accountGroupId);
+                return g ? `${g.name} (${g.codeMin}-${g.codeMax})` : null;
+              })()}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            {(groups || []).map((g: any) => (
+              <SelectItem key={g.id} value={g.id}>{g.name} ({g.codeMin}-{g.codeMax})</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="space-y-2">
+        <Label>Code *</Label>
+        <Input type="number" required value={formData.code} onChange={e => setFormData({ ...formData, code: e.target.value })} placeholder="e.g. 450 (must be unique within group)" disabled={!!initialData?.id} />
+        <p className="text-xs text-muted-foreground">Code must be unique. Pre-seeded codes (e.g. 400, 429, 800) are already in use.</p>
+      </div>
+      <div className="space-y-2">
         <Label>Name *</Label>
-        <Input required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} placeholder="e.g. Office supplies" />
+        <Input required value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} placeholder="e.g. Advertising & Marketing" />
       </div>
       <div className="space-y-2">
         <Label>Description</Label>
-        <Input value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} placeholder="Optional" />
+        <Input value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} placeholder="Optional" />
       </div>
       <div className="space-y-2">
         <Label>Default VAT %</Label>
-        <Input type="number" step="0.01" min="0" max="100" value={formData.defaultVatRate} onChange={e => setFormData({...formData, defaultVatRate: parseFloat(e.target.value)})} />
+        <Input type="number" step="0.01" min="0" max="100" value={formData.defaultVatRate} onChange={e => setFormData({ ...formData, defaultVatRate: e.target.value })} placeholder="Leave empty for non-expense" />
       </div>
       <div className="space-y-2">
-        <Label>Account Code</Label>
-        <Input value={formData.accountCode} onChange={e => setFormData({...formData, accountCode: e.target.value})} placeholder="e.g. 6100" />
+        <Label>Sort order</Label>
+        <Input type="number" min="0" value={formData.sortOrder} onChange={e => setFormData({ ...formData, sortOrder: parseInt(e.target.value, 10) || 0 })} />
       </div>
-      <div className="space-y-2">
-        <Label>Sort Order</Label>
-        <Input type="number" min="0" value={formData.sortOrder} onChange={e => setFormData({...formData, sortOrder: parseInt(e.target.value)})} />
-      </div>
-      <Button type="submit" className="w-full" disabled={saveCategory.isPending}>
-        {saveCategory.isPending ? 'Saving...' : 'Save Category'}
+      <Button type="submit" className="w-full" disabled={saveAccount.isPending}>
+        {saveAccount.isPending ? 'Saving...' : 'Save account'}
       </Button>
     </form>
   );
