@@ -1,19 +1,10 @@
 const express = require('express');
 const { pool } = require('../db/pool');
+const fiscal = require('../lib/fiscal');
 
 const router = express.Router();
 
-function getQuarterDates(year, quarter) {
-  const startMonth = (quarter - 1) * 3;
-  const startDate = new Date(year, startMonth, 1);
-  const endDate = new Date(year, startMonth + 3, 0);
-  return {
-    from: startDate.toISOString().slice(0, 10),
-    to: endDate.toISOString().slice(0, 10),
-  };
-}
-
-// Calculate VAT for a specific quarter
+// Calculate VAT for a specific quarter (fiscal-aware)
 router.get('/quarterly', async (req, res) => {
   const year = parseInt(req.query.year) || new Date().getFullYear();
   const quarter = parseInt(req.query.quarter) || Math.floor((new Date().getMonth() + 3) / 3);
@@ -22,7 +13,10 @@ router.get('/quarterly', async (req, res) => {
     return res.status(400).json({ error: 'Quarter must be between 1 and 4' });
   }
 
-  const { from, to } = getQuarterDates(year, quarter);
+  const config = await fiscal.getFiscalConfig();
+  const { startDate, endDate } = fiscal.getFiscalQuarterBounds(year, quarter, config);
+  const from = startDate;
+  const to = endDate;
 
   // VAT from sales (to pay)
   const salesVatResult = await pool.query(
@@ -123,15 +117,15 @@ router.get('/quarterly', async (req, res) => {
   });
 });
 
-// Get VAT summary for a year (all quarters)
+// Get VAT summary for a year (all quarters, fiscal-aware)
 router.get('/yearly', async (req, res) => {
   const year = parseInt(req.query.year) || new Date().getFullYear();
-  const from = `${year}-01-01`;
-  const to = `${year}-12-31`;
+  const config = await fiscal.getFiscalConfig();
+  const { startDate: from, endDate: to } = fiscal.getFiscalYearBounds(year, config);
 
   const quarters = [];
   for (let q = 1; q <= 4; q++) {
-    const { from: qFrom, to: qTo } = getQuarterDates(year, q);
+    const { startDate: qFrom, endDate: qTo } = fiscal.getFiscalQuarterBounds(year, q, config);
 
     const salesResult = await pool.query(
       `SELECT COALESCE(SUM(vat), 0) as vat FROM sales
@@ -176,11 +170,17 @@ router.get('/yearly', async (req, res) => {
   });
 });
 
-// Get expense summary by category for PnL reports
+// Get expense summary by category for PnL reports (fiscal-aware when from/to not provided)
 router.get('/expense-summary', async (req, res) => {
   const year = parseInt(req.query.year) || new Date().getFullYear();
-  const from = req.query.from || `${year}-01-01`;
-  const to = req.query.to || `${year}-12-31`;
+  let from = req.query.from;
+  let to = req.query.to;
+  if (!from || !to) {
+    const config = await fiscal.getFiscalConfig();
+    const bounds = fiscal.getFiscalYearBounds(year, config);
+    from = from || bounds.startDate;
+    to = to || bounds.endDate;
+  }
 
   const result = await pool.query(
     `SELECT 

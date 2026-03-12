@@ -65,6 +65,8 @@ The app is built to run behind a reverse proxy (`trust proxy` is enabled). To se
    server {
        listen 80;
        server_name contador.example.com;
+       # Allow batch expense import (e.g. 30 files × 1MB)
+       client_max_body_size 35M;
 
        location / {
            proxy_pass http://127.0.0.1:3080;

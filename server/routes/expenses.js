@@ -41,7 +41,7 @@ const batchStorage = multer.diskStorage({
     cb(null, `${String(idx).padStart(3, '0')}_${safeFilename(file.originalname)}`);
   },
 });
-const batchUpload = multer({ storage: batchStorage, limits: { fileSize: 10 * 1024 * 1024 } });
+const batchUpload = multer({ storage: batchStorage, limits: { fileSize: 1 * 1024 * 1024 } }); // 1MB per file for batch import
 
 const router = express.Router();
 

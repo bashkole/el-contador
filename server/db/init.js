@@ -84,7 +84,7 @@ async function init() {
           ALTER TABLE bank_transactions DROP CONSTRAINT bank_transactions_reconciliation_ref_type_check;
         END IF;
         ALTER TABLE bank_transactions ADD CONSTRAINT bank_transactions_reconciliation_ref_type_check
-          CHECK (reconciliation_ref_type IN ('expense', 'sale', 'expenses', 'account', 'transfer'));
+          CHECK (reconciliation_ref_type IN ('expense', 'sale', 'expenses', 'account', 'transfer', 'journal'));
       EXCEPTION WHEN duplicate_object THEN NULL;
       END $$;
     `);
@@ -98,6 +98,20 @@ async function init() {
           CHECK (source_ref_type IN ('expense', 'sale', 'bank', 'manual', 'transfer'));
       EXCEPTION WHEN duplicate_object THEN NULL;
       END $$;
+    `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS expense_bank_transactions (
+        expense_id uuid NOT NULL REFERENCES expenses(id) ON DELETE CASCADE,
+        bank_transaction_id uuid NOT NULL REFERENCES bank_transactions(id) ON DELETE CASCADE,
+        PRIMARY KEY (expense_id, bank_transaction_id)
+      );
+    `);
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_expense_bank_tx_bank ON expense_bank_transactions(bank_transaction_id)');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_expense_bank_tx_expense ON expense_bank_transactions(expense_id)');
+    await pool.query(`
+      INSERT INTO expense_bank_transactions (expense_id, bank_transaction_id)
+      SELECT id, bank_transaction_id FROM expenses WHERE bank_transaction_id IS NOT NULL
+      ON CONFLICT (expense_id, bank_transaction_id) DO NOTHING
     `);
   } catch (e) { /* columns may already exist */ }
   const bcrypt = require('bcrypt');

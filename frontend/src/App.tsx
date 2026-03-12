@@ -8,6 +8,7 @@ import Expenses from './pages/Expenses';
 import Sales from './pages/Sales';
 import Bank from './pages/Bank';
 import Reconciliation from './pages/Reconciliation';
+import AccountLedger from './pages/AccountLedger';
 import Contacts from './pages/Contacts';
 import Settings from './pages/Settings';
 
@@ -33,6 +34,7 @@ function App() {
               <Route path="sales" element={<Sales />} />
               <Route path="bank" element={<Bank />} />
               <Route path="reconciliation" element={<Reconciliation />} />
+              <Route path="accounts/:id" element={<AccountLedger />} />
               <Route path="contacts" element={<Contacts />} />
               <Route path="settings" element={<Settings />} />
             </Route>

@@ -12,7 +12,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useInvoiceConfig, useSaveInvoiceConfig, useUploadLogo, useIntegrationsSettings, useSaveIntegrationsSettings, useUsers, useCreateUser, useDeleteUser, useApprovalSettings, useSaveApprovalSettings, useAccountGroups, useAccountsAll, useSaveAccount, useDeleteAccount } from '../hooks/useSettings';
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'sonner';
-import { Trash2, Edit, Plus } from 'lucide-react';
+import { Trash2, Edit, Plus, BookOpen } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 
 export default function Settings() {
@@ -28,14 +29,15 @@ export default function Settings() {
       <Tabs defaultValue="invoice" className="w-full grid grid-cols-1 grid-rows-[auto_1fr] gap-4 [&>*]:min-w-0">
         <TabsList className="grid w-full grid-cols-2 md:grid-cols-5 h-auto p-1 bg-muted/50 rounded-lg row-start-1">
           <TabsTrigger value="invoice" className="py-2.5 data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all">Invoice</TabsTrigger>
-          <TabsTrigger value="integrations" className="py-2.5 data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all">Integrations</TabsTrigger>
+          <TabsTrigger value="integrations" className="py-2.5 data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all">Payments</TabsTrigger>
           <TabsTrigger value="users" className="py-2.5 data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all">Users</TabsTrigger>
           <TabsTrigger value="approval" className="py-2.5 data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all">Approval</TabsTrigger>
           <TabsTrigger value="accounts" className="py-2.5 data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all">Chart of accounts</TabsTrigger>
         </TabsList>
         <div className="row-start-2 min-h-0">
-          <TabsContent value="invoice" className="m-0">
+          <TabsContent value="invoice" className="m-0 space-y-6">
             <InvoiceSettings />
+            <FiscalSettings />
           </TabsContent>
           <TabsContent value="integrations" className="m-0">
             <IntegrationsSettings />
@@ -208,6 +210,119 @@ function InvoiceSettings() {
   );
 }
 
+function pad2(n: number) {
+  return String(n).padStart(2, '0');
+}
+
+function FiscalSettings() {
+  const { data: config, isLoading } = useInvoiceConfig();
+  const saveConfig = useSaveInvoiceConfig();
+  const queryClient = useQueryClient();
+
+  const [fiscalYearEnabled, setFiscalYearEnabled] = useState(false);
+  const [fiscalYearStartMonth, setFiscalYearStartMonth] = useState(1);
+  const [fiscalYearStartDay, setFiscalYearStartDay] = useState(1);
+  const [fiscalStartInput, setFiscalStartInput] = useState('01/01');
+
+  useEffect(() => {
+    if (config) {
+      setFiscalYearEnabled(Boolean(config.fiscalYearEnabled));
+      const month = Math.min(12, Math.max(1, Number(config.fiscalYearStartMonth) || 1));
+      const day = Math.min(31, Math.max(1, Number(config.fiscalYearStartDay) || 1));
+      setFiscalYearStartMonth(month);
+      setFiscalYearStartDay(day);
+      setFiscalStartInput(`${pad2(month)}/${pad2(day)}`);
+    }
+  }, [config]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await saveConfig.mutateAsync({
+        fiscalYearEnabled,
+        fiscalYearStartMonth,
+        fiscalYearStartDay,
+      });
+      queryClient.invalidateQueries({ queryKey: ['account-ledger'] });
+      queryClient.invalidateQueries({ queryKey: ['vat'] });
+      toast.success('Fiscal year settings saved');
+    } catch (err) {
+      toast.error('Failed to save fiscal settings');
+    }
+  };
+
+  const handleFiscalStartChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value.replace(/\D/g, '').slice(0, 4);
+    const formatted = raw.length <= 2 ? raw : raw.slice(0, 2) + '/' + raw.slice(2);
+    setFiscalStartInput(formatted);
+    if (raw.length >= 2) {
+      const month = Math.min(12, Math.max(1, parseInt(raw.slice(0, 2), 10) || 1));
+      setFiscalYearStartMonth(month);
+    }
+    if (raw.length === 4) {
+      const day = Math.min(31, Math.max(1, parseInt(raw.slice(2, 4), 10) || 1));
+      setFiscalYearStartDay(day);
+    }
+  };
+
+  if (isLoading) return <div>Loading...</div>;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Fiscal year</CardTitle>
+        <CardDescription>
+          Default is calendar year (1 Jan - 31 Dec). With a custom start (e.g. 1 April), fiscal year can be adjusted to your needs for reports and financial start end dates.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="rounded-lg border p-4 bg-muted/30 space-y-4">
+            <div className="flex items-start gap-3">
+              <input
+                type="checkbox"
+                id="fiscal-year-enabled"
+                checked={fiscalYearEnabled}
+                onChange={(e) => setFiscalYearEnabled(e.target.checked)}
+                className="mt-1 h-4 w-4 rounded border-input"
+              />
+              <div className="flex-1 space-y-1">
+                <Label htmlFor="fiscal-year-enabled" className="text-base font-medium cursor-pointer">
+                  Use custom fiscal year
+                </Label>
+                <p className="text-sm text-muted-foreground">
+                  When off, all periods use calendar year (1 Jan - 31 Dec). When on, set the first day of your fiscal year (e.g. 04/01 for UK).
+                </p>
+              </div>
+            </div>
+            <div className="space-y-1.5 pl-7">
+              <Label htmlFor="fiscal-start-mmdd" className={!fiscalYearEnabled ? 'text-muted-foreground' : ''}>
+                Set fiscal day start
+              </Label>
+              <Input
+                id="fiscal-start-mmdd"
+                type="text"
+                inputMode="numeric"
+                autoComplete="off"
+                placeholder="set fiscal day start (mm/dd)"
+                value={fiscalStartInput}
+                onChange={handleFiscalStartChange}
+                disabled={!fiscalYearEnabled}
+                className="w-full max-w-xs font-mono"
+                maxLength={5}
+              />
+            </div>
+          </div>
+
+          <Button type="submit" disabled={saveConfig.isPending}>
+            {saveConfig.isPending ? 'Saving...' : 'Save fiscal settings'}
+          </Button>
+        </form>
+      </CardContent>
+    </Card>
+  );
+}
+
 function IntegrationsSettings() {
   const { data: settings, isLoading } = useIntegrationsSettings();
   const saveSettings = useSaveIntegrationsSettings();
@@ -218,18 +333,18 @@ function IntegrationsSettings() {
     stripeWebhookSecret: '',
     paddleEnabled: false,
     paddleApiKey: '',
-    paddleWebhookSecret: ''
+    paddleWebhookSecret: '',
   });
 
   useEffect(() => {
     if (settings) {
       setFormData({
-        stripeEnabled: settings.stripeEnabled || false,
+        stripeEnabled: Boolean(settings.stripeEnabled),
         stripeSecretKey: settings.stripeSecretKey || '',
         stripeWebhookSecret: settings.stripeWebhookSecret || '',
-        paddleEnabled: settings.paddleEnabled || false,
+        paddleEnabled: Boolean(settings.paddleEnabled),
         paddleApiKey: settings.paddleApiKey || '',
-        paddleWebhookSecret: settings.paddleWebhookSecret || ''
+        paddleWebhookSecret: settings.paddleWebhookSecret || '',
       });
     }
   }, [settings]);
@@ -238,7 +353,7 @@ function IntegrationsSettings() {
     e.preventDefault();
     try {
       await saveSettings.mutateAsync(formData);
-      toast.success('Integrations saved successfully');
+      toast.success('Integrations saved');
     } catch (err) {
       toast.error('Failed to save integrations');
     }
@@ -249,8 +364,8 @@ function IntegrationsSettings() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Integrations</CardTitle>
-        <CardDescription>Connect external services to automatically sync transactions.</CardDescription>
+        <CardTitle>Payments / Integrations</CardTitle>
+        <CardDescription>Connect payment providers (e.g. Stripe, Paddle) to sync payments.</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -258,54 +373,46 @@ function IntegrationsSettings() {
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="font-medium text-lg">Stripe</h3>
-                <p className="text-sm text-muted-foreground">Sync Stripe payments as sales invoices.</p>
+                <p className="text-sm text-muted-foreground">Sync Stripe payments as sales.</p>
               </div>
-              <Switch checked={formData.stripeEnabled} onCheckedChange={c => setFormData({...formData, stripeEnabled: c})} />
+              <Switch checked={formData.stripeEnabled} onCheckedChange={(c) => setFormData({ ...formData, stripeEnabled: c })} />
             </div>
             {formData.stripeEnabled && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Secret Key</Label>
-                  <Input type="password" value={formData.stripeSecretKey} onChange={e => setFormData({...formData, stripeSecretKey: e.target.value})} />
+                  <Input type="password" value={formData.stripeSecretKey} onChange={(e) => setFormData({ ...formData, stripeSecretKey: e.target.value })} placeholder="sk_..." />
                 </div>
                 <div className="space-y-2">
                   <Label>Webhook Secret</Label>
-                  <Input type="password" value={formData.stripeWebhookSecret} onChange={e => setFormData({...formData, stripeWebhookSecret: e.target.value})} />
-                </div>
-                <div className="col-span-full">
-                  <p className="text-xs text-muted-foreground">Webhook URL: <code className="bg-muted px-1 py-0.5 rounded">/api/webhooks/stripe</code></p>
+                  <Input type="password" value={formData.stripeWebhookSecret} onChange={(e) => setFormData({ ...formData, stripeWebhookSecret: e.target.value })} />
                 </div>
               </div>
             )}
           </div>
-
           <div className="p-4 border rounded-lg space-y-4">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="font-medium text-lg">Paddle</h3>
-                <p className="text-sm text-muted-foreground">Sync Paddle transactions as sales invoices.</p>
+                <p className="text-sm text-muted-foreground">Sync Paddle payments as sales.</p>
               </div>
-              <Switch checked={formData.paddleEnabled} onCheckedChange={c => setFormData({...formData, paddleEnabled: c})} />
+              <Switch checked={formData.paddleEnabled} onCheckedChange={(c) => setFormData({ ...formData, paddleEnabled: c })} />
             </div>
             {formData.paddleEnabled && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>API Key</Label>
-                  <Input type="password" value={formData.paddleApiKey} onChange={e => setFormData({...formData, paddleApiKey: e.target.value})} />
+                  <Input type="password" value={formData.paddleApiKey} onChange={(e) => setFormData({ ...formData, paddleApiKey: e.target.value })} />
                 </div>
                 <div className="space-y-2">
                   <Label>Webhook Secret</Label>
-                  <Input type="password" value={formData.paddleWebhookSecret} onChange={e => setFormData({...formData, paddleWebhookSecret: e.target.value})} />
-                </div>
-                <div className="col-span-full">
-                  <p className="text-xs text-muted-foreground">Webhook URL: <code className="bg-muted px-1 py-0.5 rounded">/api/webhooks/paddle</code></p>
+                  <Input type="password" value={formData.paddleWebhookSecret} onChange={(e) => setFormData({ ...formData, paddleWebhookSecret: e.target.value })} />
                 </div>
               </div>
             )}
           </div>
-          
           <Button type="submit" disabled={saveSettings.isPending}>
-            {saveSettings.isPending ? 'Saving...' : 'Save integrations'}
+            {saveSettings.isPending ? 'Saving...' : 'Save'}
           </Button>
         </form>
       </CardContent>
@@ -613,13 +720,13 @@ function ChartOfAccountsSettings() {
               <Button variant="outline" size="sm" onClick={() => openCreate(g.id)}>Add account</Button>
             </div>
             <Table>
-              <TableHeader>
+                <TableHeader>
                 <TableRow>
                   <TableHead className="w-20">Code</TableHead>
                   <TableHead>Name</TableHead>
                   <TableHead>Description</TableHead>
                   <TableHead className="w-20">VAT %</TableHead>
-                  <TableHead className="w-24">Actions</TableHead>
+                  <TableHead className="w-32">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -631,6 +738,11 @@ function ChartOfAccountsSettings() {
                     <TableCell>{a.defaultVatRate != null ? `${a.defaultVatRate}%` : '-'}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
+                        <Link to={`/accounts/${a.id}`} title="View ledger">
+                          <Button variant="ghost" size="icon" type="button">
+                            <BookOpen className="w-4 h-4" />
+                          </Button>
+                        </Link>
                         <Button variant="ghost" size="icon" onClick={() => openEdit(a)}>
                           <Edit className="w-4 h-4" />
                         </Button>

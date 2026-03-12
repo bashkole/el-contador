@@ -38,7 +38,7 @@ export function useUploadLogo() {
   });
 }
 
-// Integrations
+// Integrations (payments)
 export function useIntegrationsSettings() {
   return useQuery({
     queryKey: ['integrations'],

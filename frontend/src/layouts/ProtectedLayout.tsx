@@ -62,33 +62,33 @@ export default function ProtectedLayout() {
   );
 
   const sidebarContent = (
-    <>
-      <div className="p-4 flex items-center min-h-[7rem]">
+    <div className="flex flex-col h-full min-h-0">
+      <div className="p-4 flex items-center min-h-[7rem] shrink-0">
         {logoUrl ? (
           <div className="rounded-lg bg-white p-2 w-full h-20 flex items-center justify-center">
             <img src={logoUrl} alt="" className="max-w-full max-h-full w-auto h-auto object-contain" />
           </div>
         ) : null}
       </div>
-      <nav className="flex-1 px-2 py-4 space-y-1">
+      <nav className="flex-1 px-2 py-4 space-y-1 overflow-y-auto min-h-0">
         {navLinks}
       </nav>
-      <div className="p-4 border-t border-slate-800">
+      <div className="p-4 border-t border-slate-800 shrink-0 mt-auto">
         <div className="flex items-center gap-3 mb-4">
           <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center">
             <Users size={16} />
           </div>
-          <div className="text-sm">
-            <div className="font-medium text-white">{user.name || 'User'}</div>
+          <div className="text-sm min-w-0">
+            <div className="font-medium text-white truncate">{user.name || 'User'}</div>
             <div className="text-xs text-slate-400 capitalize">{user.role}</div>
           </div>
         </div>
         <Button variant="outline" className="w-full justify-start text-slate-800 bg-white" onClick={() => { setMobileNavOpen(false); logout(); }}>
-          <LogOut className="mr-2 h-4 w-4" />
+          <LogOut className="mr-2 h-4 w-4 shrink-0" />
           Log out
         </Button>
       </div>
-    </>
+    </div>
   );
 
   return (
@@ -113,8 +113,8 @@ export default function ProtectedLayout() {
         ) : null}
       </header>
 
-      {/* Desktop: sidebar */}
-      <aside className="hidden md:flex w-64 bg-slate-900 text-slate-300 flex-col shrink-0">
+      {/* Desktop: sidebar - user and logout pinned to bottom */}
+      <aside className="hidden md:flex w-64 bg-slate-900 text-slate-300 flex-col shrink-0 h-screen sticky top-0">
         {sidebarContent}
       </aside>
 

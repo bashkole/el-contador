@@ -14,24 +14,20 @@ const accountsRoutes = require('./routes/accounts');
 const salesRoutes = require('./routes/sales');
 const bankRoutes = require('./routes/bank');
 const reconciliationRoutes = require('./routes/reconciliation');
+const journalRoutes = require('./routes/journal');
 const invoiceConfigRoutes = require('./routes/invoice-config');
-const approvalSettingsRoutes = require('./routes/approval-settings');
 const integrationsRoutes = require('./routes/integrations');
+const approvalSettingsRoutes = require('./routes/approval-settings');
 const dashboardRoutes = require('./routes/dashboard');
 const customersRoutes = require('./routes/customers');
 const suppliersRoutes = require('./routes/suppliers');
 const payeesRoutes = require('./routes/payees');
 const vatReportsRoutes = require('./routes/vat-reports');
-const webhooksRoutes = require('./routes/webhooks');
-
 const PgSession = connectPgSimple(session);
 const app = express();
 
 // Required when behind a reverse proxy (Apache/nginx) so cookies and redirects use correct scheme/host
 app.set('trust proxy', 1);
-
-// Mount webhooks before generic JSON parsing because Stripe requires raw body
-app.use('/api/webhooks', webhooksRoutes);
 
 app.use(cookieParser());
 app.use(express.json());
@@ -77,9 +73,10 @@ app.use('/api/accounts', requireAuth, accountsRoutes);
 app.use('/api/sales', requireAuth, salesRoutes);
 app.use('/api/bank-transactions', requireAuth, bankRoutes);
 app.use('/api/reconciliation', requireAuth, reconciliationRoutes);
+app.use('/api/journal', requireAuth, journalRoutes);
 app.use('/api/invoice-config', requireAuth, invoiceConfigRoutes);
-app.use('/api/approval-settings', approvalSettingsRoutes);
 app.use('/api/integrations', requireAuth, integrationsRoutes);
+app.use('/api/approval-settings', approvalSettingsRoutes);
 app.use('/api/dashboard', requireAuth, dashboardRoutes);
 app.use('/api/customers', requireAuth, customersRoutes);
 app.use('/api/suppliers', requireAuth, suppliersRoutes);

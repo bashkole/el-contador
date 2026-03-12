@@ -46,6 +46,7 @@ The admin (admin.ikomex.nl) now uses **login + PostgreSQL + Node server**. If th
 
 - [ ] In Plesk (or your reverse proxy), set the **admin.ikomex.nl** subdomain to proxy to `http://127.0.0.1:3000` (or the port in `server/.env`).
 - [ ] Or point the document root of admin.ikomex.nl to a proxy that forwards to that port.
+- [ ] For batch expense import (30+ files): in the proxy, set upload body limit to at least 35MB (e.g. nginx `client_max_body_size 35M;`, Apache `LimitRequestBody 36700160`). Batch files are limited to 1MB each.
 
 ### 6. Log in
 

@@ -148,6 +148,15 @@ CREATE INDEX IF NOT EXISTS idx_suppliers_name ON suppliers(name);
 ALTER TABLE expenses ADD COLUMN IF NOT EXISTS bank_transaction_id uuid REFERENCES bank_transactions(id) ON DELETE SET NULL;
 CREATE INDEX IF NOT EXISTS idx_expenses_bank_transaction ON expenses(bank_transaction_id);
 
+-- Junction table: one expense can be paid by multiple bank transactions (and one bank tx can pay multiple expenses)
+CREATE TABLE IF NOT EXISTS expense_bank_transactions (
+  expense_id uuid NOT NULL REFERENCES expenses(id) ON DELETE CASCADE,
+  bank_transaction_id uuid NOT NULL REFERENCES bank_transactions(id) ON DELETE CASCADE,
+  PRIMARY KEY (expense_id, bank_transaction_id)
+);
+CREATE INDEX IF NOT EXISTS idx_expense_bank_tx_bank ON expense_bank_transactions(bank_transaction_id);
+CREATE INDEX IF NOT EXISTS idx_expense_bank_tx_expense ON expense_bank_transactions(expense_id);
+
 -- Expense categories for proper PnL and chart reporting
 CREATE TABLE IF NOT EXISTS expense_categories (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -344,6 +353,17 @@ BEGIN
   END IF;
   ALTER TABLE bank_transactions ADD CONSTRAINT bank_transactions_reconciliation_ref_type_check
     CHECK (reconciliation_ref_type IN ('expense', 'sale', 'expenses', 'account', 'transfer'));
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+-- Migration: Allow reconciliation_ref_type 'journal' for matching bank tx to manual journal entry
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'bank_transactions_reconciliation_ref_type_check') THEN
+    ALTER TABLE bank_transactions DROP CONSTRAINT bank_transactions_reconciliation_ref_type_check;
+  END IF;
+  ALTER TABLE bank_transactions ADD CONSTRAINT bank_transactions_reconciliation_ref_type_check
+    CHECK (reconciliation_ref_type IN ('expense', 'sale', 'expenses', 'account', 'transfer', 'journal'));
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 

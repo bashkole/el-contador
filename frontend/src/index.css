@@ -37,11 +37,11 @@
     --chart-revenue: #42d4a6;
     --chart-expenses: #f13f66;
     /* Reconciliation match block */
-    --reconciliation-match-bg: #eff6ff;
-    --reconciliation-match-border: lch(88.74% 26.13 221.7);
+    --reconciliation-match-bg: #edeebb;
+    --reconciliation-match-border: #dbdfae;
     --reconciliation-match-muted-bg: rgba(239, 246, 255, 0.6);
-    --reconciliation-selected-bg: #eff6ff;
-    --reconciliation-selected-hover: #dbeafe;
+    --reconciliation-selected-bg: #96c4b1;
+    --reconciliation-selected-hover: #c2f5db;
     --radius: 0.625rem;
     --sidebar: oklch(0.985 0 0);
     --sidebar-foreground: oklch(0.145 0 0);

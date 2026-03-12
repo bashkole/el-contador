@@ -695,7 +695,10 @@ export default function Expenses() {
           {batchStep === 1 && (
             <div className="space-y-4 py-2">
               <p className="text-sm text-muted-foreground">
-                Select invoice files from your computer (PDF, JPG, PNG, WebP, GIF). They will be copied temporarily and processed with AI extraction.
+                Select invoice files from your computer (PDF, JPG, PNG, WebP, GIF). Max 1MB per file. They will be copied temporarily and processed with AI extraction.
+              </p>
+              <p className="text-xs text-muted-foreground">
+                If upload fails with many files (413), the web server in front of this app often has a 1MB total request limit. An administrator must raise it to at least 35M for this domain (nginx: client_max_body_size 35M; Apache: LimitRequestBody 36700160).
               </p>
               <div className="flex flex-col gap-2">
                 <Input
@@ -724,7 +727,12 @@ export default function Expenses() {
                       setSupplierMappings(initial);
                       setBatchStep(2);
                     } catch (err: any) {
-                      setBatchUploadError(err.response?.data?.error || err.message || 'Upload failed');
+                      const status = err.response?.status;
+                      if (status === 413) {
+                        setBatchUploadError('Request too large. The web server (proxy) in front of this app is rejecting the request—it often has a 1MB total limit, so many small files can trigger this. An administrator must raise the limit for this domain: nginx use client_max_body_size 35M; Apache use LimitRequestBody 36700160. Then try again.');
+                      } else {
+                        setBatchUploadError(err.response?.data?.error || err.message || 'Upload failed');
+                      }
                     } finally {
                       setBatchUploading(false);
                     }
@@ -748,7 +756,7 @@ export default function Expenses() {
                   <div key={vendor} className="flex flex-wrap items-end gap-2 p-2 border rounded">
                     <span className="font-medium w-full text-sm text-muted-foreground">{vendor}</span>
                     <Select
-                      value={supplierMappings[vendor]?.type === 'existing' ? (supplierMappings[vendor] as { type: 'existing'; supplierId: string }).supplierId : 'new'}
+                      value={supplierMappings[vendor]?.type === 'existing' ? String((supplierMappings[vendor] as { type: 'existing'; supplierId: string }).supplierId) : 'new'}
                       onValueChange={(val) => {
                         if (val === 'new' || !val) {
                           setSupplierMappings((m) => ({ ...m, [vendor]: { type: 'new', name: vendor, categoryId: null } }));
@@ -763,7 +771,7 @@ export default function Expenses() {
                       <SelectContent>
                         <SelectItem value="new">Create new supplier</SelectItem>
                         {(suppliers || []).map((s) => (
-                          <SelectItem key={s.id} value={s.id}>
+                          <SelectItem key={String(s.id)} value={String(s.id)}>
                             {s.name}
                             {s.categoryName ? ` (${s.categoryName})` : ''}
                           </SelectItem>

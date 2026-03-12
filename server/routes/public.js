@@ -1,6 +1,7 @@
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
+const sharp = require('sharp');
 const { pool } = require('../db/pool');
 
 const router = express.Router();
@@ -31,23 +32,32 @@ router.get('/logo', (req, res) => {
   }).catch(() => res.status(500).end());
 });
 
-router.get('/favicon', (req, res) => {
-  const faviconPath = path.join(logoDir, 'favicon.png');
-  const resolvedPath = path.resolve(faviconPath);
-  const exists = fs.existsSync(faviconPath);
-  const ts = new Date().toISOString();
-  process.stderr.write(`[public] GET /favicon logoDir=${logoDir} faviconPath=${faviconPath} resolved=${resolvedPath} exists=${exists}\n`);
-  if (!exists) {
-    process.stderr.write(`[public] GET /favicon -> 404 (favicon.png not found)\n`);
-    return res.status(404).end();
-  }
-  res.sendFile(resolvedPath, {
-    headers: {
+router.get('/favicon', async (req, res) => {
+  process.stderr.write(`[public] GET /favicon logoDir=${logoDir}\n`);
+  try {
+    const r = await pool.query('SELECT data FROM invoice_settings WHERE id = 1');
+    const data = r.rows[0]?.data || {};
+    const logoPath = data.logoPath;
+    if (!logoPath) {
+      process.stderr.write(`[public] GET /favicon -> 404 (no logoPath in settings)\n`);
+      return res.status(404).end();
+    }
+    const logoFilePath = path.join(logoDir, logoPath);
+    if (!fs.existsSync(logoFilePath)) {
+      process.stderr.write(`[public] GET /favicon -> 404 (logo file not found: ${logoFilePath})\n`);
+      return res.status(404).end();
+    }
+    const pngBuffer = await sharp(logoFilePath).resize(32, 32).png().toBuffer();
+    res.set({
       'Cache-Control': 'public, max-age=86400',
       'Content-Type': 'image/png',
-    },
-  });
-  process.stderr.write(`[public] GET /favicon -> 200 sent\n`);
+    });
+    res.send(pngBuffer);
+    process.stderr.write(`[public] GET /favicon -> 200 (generated from ${logoPath})\n`);
+  } catch (err) {
+    process.stderr.write(`[public] GET /favicon -> 500 ${err.message}\n`);
+    res.status(500).end();
+  }
 });
 
 module.exports = router;

@@ -32,6 +32,63 @@ async function deleteTransferJournalEntry(bankTransactionId1, bankTransactionId2
   );
 }
 
+/** Delete journal entry for a bank transaction reconciled to an account (source_ref_type = 'bank'). */
+async function deleteBankAccountJournalEntry(bankTransactionId) {
+  if (!bankTransactionId) return;
+  await pool.query(
+    'DELETE FROM journal_entries WHERE source_ref_type = $1 AND source_ref_id = $2',
+    ['bank', bankTransactionId]
+  );
+}
+
+/**
+ * Post a bank transaction to the journal when reconciled to a ledger account (e.g. director loan).
+ * type 'in': Dr bank account, Cr ledgerAccountId. type 'out': Dr ledgerAccountId, Cr bank account.
+ * Call after match-account with ledgerAccountId. Idempotent: deletes existing entry first.
+ */
+async function postBankToAccount(bankTransactionId, ledgerAccountId) {
+  const txRow = await pool.query(
+    'SELECT id, account_id, date, type, amount FROM bank_transactions WHERE id = $1',
+    [bankTransactionId]
+  );
+  if (txRow.rows.length === 0) return;
+  const tx = txRow.rows[0];
+  const bankAccountId = tx.account_id;
+  if (!bankAccountId || !ledgerAccountId) return;
+  const accCheck = await pool.query(
+    'SELECT id FROM accounts WHERE id = $1 AND active = true',
+    [ledgerAccountId]
+  );
+  if (accCheck.rows.length === 0) return;
+  const amount = Math.round(Number(tx.amount) * 100) / 100;
+  if (amount <= 0) return;
+
+  await deleteBankAccountJournalEntry(bankTransactionId);
+
+  const desc = 'Bank reconciliation to account';
+  const je = await pool.query(
+    `INSERT INTO journal_entries (date, description, source_ref_type, source_ref_id)
+     VALUES ($1, $2, 'bank', $3)
+     RETURNING id`,
+    [tx.date, desc, bankTransactionId]
+  );
+  const entryId = je.rows[0].id;
+
+  if (tx.type === 'in') {
+    await pool.query(
+      `INSERT INTO journal_lines (journal_entry_id, account_id, debit_amount, credit_amount)
+       VALUES ($1, $2, $3, 0), ($1, $4, 0, $3)`,
+      [entryId, bankAccountId, amount, ledgerAccountId]
+    );
+  } else {
+    await pool.query(
+      `INSERT INTO journal_lines (journal_entry_id, account_id, debit_amount, credit_amount)
+       VALUES ($1, $2, $3, 0), ($1, $4, 0, $3)`,
+      [entryId, ledgerAccountId, amount, bankAccountId]
+    );
+  }
+}
+
 /**
  * Post an expense to the journal: Dr Expense account, Cr Accounts Payable.
  * Call after expense create or update. If an entry already exists for this expense, it is replaced.
@@ -159,7 +216,9 @@ module.exports = {
   postExpense,
   postSale,
   postTransfer,
+  postBankToAccount,
   deleteJournalEntryForSource,
   deleteTransferJournalEntry,
+  deleteBankAccountJournalEntry,
   getAccountIdByCode,
 };

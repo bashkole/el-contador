@@ -30,6 +30,9 @@ const DEFAULTS = {
   footer: 'Thank you for your business.',
   logoPath: '',
   geminiModel: 'gemini-2.0-flash',
+  fiscalYearEnabled: false,
+  fiscalYearStartMonth: 1,
+  fiscalYearStartDay: 1,
 };
 
 router.get('/', async (req, res) => {
@@ -46,8 +49,15 @@ router.get('/', async (req, res) => {
   } else {
     data.geminiApiKeySet = false;
   }
+  data.fiscalYearEnabled = Boolean(data.fiscalYearEnabled);
+  data.fiscalYearStartMonth = Math.min(12, Math.max(1, Number(data.fiscalYearStartMonth) || 1));
+  data.fiscalYearStartDay = Math.min(31, Math.max(1, Number(data.fiscalYearStartDay) || 1));
   res.json(data);
 });
+
+function daysInMonth(year, month) {
+  return new Date(year, month, 0).getDate();
+}
 
 router.put('/', async (req, res) => {
   const body = req.body || {};
@@ -63,7 +73,12 @@ router.put('/', async (req, res) => {
     footer: String(body.footer ?? existing.footer ?? '').trim() || DEFAULTS.footer,
     logoPath: existing.logoPath || '',
     geminiModel: String(body.geminiModel ?? existing.geminiModel ?? '').trim() || DEFAULTS.geminiModel,
+    fiscalYearEnabled: body.hasOwnProperty('fiscalYearEnabled') ? Boolean(body.fiscalYearEnabled) : Boolean(existing.fiscalYearEnabled ?? DEFAULTS.fiscalYearEnabled),
+    fiscalYearStartMonth: body.hasOwnProperty('fiscalYearStartMonth') ? Math.min(12, Math.max(1, parseInt(String(body.fiscalYearStartMonth), 10) || 1)) : (existing.fiscalYearStartMonth ?? DEFAULTS.fiscalYearStartMonth),
+    fiscalYearStartDay: body.hasOwnProperty('fiscalYearStartDay') ? Math.min(31, Math.max(1, parseInt(String(body.fiscalYearStartDay), 10) || 1)) : (existing.fiscalYearStartDay ?? DEFAULTS.fiscalYearStartDay),
   };
+  const maxDay = daysInMonth(2024, data.fiscalYearStartMonth);
+  if (data.fiscalYearStartDay > maxDay) data.fiscalYearStartDay = maxDay;
   if (body.hasOwnProperty('geminiApiKey')) {
     const key = typeof body.geminiApiKey === 'string' ? body.geminiApiKey.trim() : '';
     data.geminiApiKey = key || null;

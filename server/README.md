@@ -36,12 +36,18 @@ Point your subdomain at this app (reverse proxy to `http://127.0.0.1:3080` or yo
 
 ### 413 Payload Too Large on file upload
 
-If users get **413** when uploading receipt images (e.g. on mobile), the request is being rejected by the **web server** (Apache/nginx) before it reaches Node, so the backend will not log the request.
+If users get **413** when uploading receipt images or doing batch import, the request is being rejected by the **web server** (Apache/nginx) before it reaches Node, so the backend will not log the request.
 
-- **Apache**: In the vhost or `.htaccess`, set `LimitRequestBody` high enough (e.g. `LimitRequestBody 10485760` for 10MB). Default is often 1MB or less.
-- **nginx**: In server/location, set `client_max_body_size 10M;` (or higher). Default is 1M.
+- **Single uploads (receipts/sales)**: Up to 10MB per file. Set the proxy limit to at least 10MB.
+- **Batch expense import (30+ files)**: Up to 1MB per file; allow at least 35MB total so 30 files can be uploaded in one request.
 
-The app allows uploads up to 10MB (expenses/sales); ensure the proxy limit is at least that.
+**nginx**: In the server or location block, set for example:
+- `client_max_body_size 10M;` for single-file uploads only.
+- `client_max_body_size 35M;` to support batch import of 30+ files (recommended).
+
+**Apache**: In the vhost or `.htaccess`:
+- `LimitRequestBody 10485760` for 10MB (single file).
+- `LimitRequestBody 36700160` for 35MB (batch import of 30+ files).
 
 ## API (all under `/api`, require session except auth)
 

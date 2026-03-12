@@ -1,6 +1,6 @@
 {
   "name": "el-contador-server",
-  "version": "1.2.7",
+  "version": "1.2.8",
   "description": "El Contador backend API and auth",
   "main": "index.js",
   "scripts": {
@@ -9,7 +9,6 @@
   },
   "dependencies": {
     "@google/genai": "^0.10.0",
-    "@paddle/paddle-node-sdk": "^3.6.0",
     "bcrypt": "^5.1.1",
     "connect-pg-simple": "^10.0.0",
     "cookie-parser": "^1.4.6",
@@ -20,7 +19,6 @@
     "nodemailer": "^8.0.1",
     "pdfkit": "^0.17.2",
     "pg": "^8.13.0",
-    "sharp": "^0.33.5",
-    "stripe": "^20.4.1"
+    "sharp": "^0.33.5"
   }
 }
