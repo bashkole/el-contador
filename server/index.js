@@ -1,5 +1,12 @@
 require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') });
 const path = require('path');
+const fs = require('fs');
+// Fail fast with a clear message if server/lib is missing (e.g. incomplete deploy)
+const libFiscal = path.join(__dirname, 'lib', 'fiscal.js');
+if (!fs.existsSync(libFiscal)) {
+  console.error('Missing server/lib/fiscal.js. Deploy the full server directory including server/lib/.');
+  process.exit(1);
+}
 const express = require('express');
 const session = require('express-session');
 const cookieParser = require('cookie-parser');
